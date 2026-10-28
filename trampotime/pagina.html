@@ -1,0 +1,1471 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrampoTime</title>
+<script>try { const t = localStorage.getItem("trampotime.tema"); if (t) document.documentElement.dataset.tema = t; } catch {}</script>
+<style>
+  :root {
+    --fundo: #f6f5f2; --cartao: #ffffff; --texto: #1f2328; --suave: #646b73; --linha: #e3e1dc;
+    --marca: #3d5afe; --marca-suave: #e8ecff; --ok: #1f8a4c; --ok-suave: #e3f4ea;
+    --alerta: #b25e00; --alerta-suave: #fff1dc; --erro: #c62828; --erro-suave: #fdeaea;
+    --reuniao: #8e44ad; --sem: #b8b4ab; --sobre-marca: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="claro"]) {
+      --fundo: #15171a; --cartao: #1e2125; --texto: #e8e6e3; --suave: #9aa1a9; --linha: #30343a;
+      --marca: #8c9eff; --marca-suave: #262c4a; --ok: #5fd08f; --ok-suave: #1b3326;
+      --alerta: #f0a64a; --alerta-suave: #3a2c17; --erro: #ff7b7b; --erro-suave: #3d1f1f;
+      --reuniao: #c39bd3; --sem: #5b5f66;
+      color-scheme: dark; --sobre-marca: #11131a;
+    }
+  }
+  :root[data-tema="escuro"] {
+    --fundo: #15171a; --cartao: #1e2125; --texto: #e8e6e3; --suave: #9aa1a9; --linha: #30343a;
+      --marca: #8c9eff; --marca-suave: #262c4a; --ok: #5fd08f; --ok-suave: #1b3326;
+      --alerta: #f0a64a; --alerta-suave: #3a2c17; --erro: #ff7b7b; --erro-suave: #3d1f1f;
+      --reuniao: #c39bd3; --sem: #5b5f66;
+      color-scheme: dark; --sobre-marca: #11131a;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 1360px; margin: 0 auto; padding: 24px 16px 64px; }
+  .leiaute { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .leiaute.sem-lateral { grid-template-columns: minmax(0, 1fr); }
+  .leiaute.sem-lateral .lateral { display: none; }
+  .principal, .lateral { display: grid; gap: 16px; min-width: 0; }
+  /* Coluna lateral do tamanho da tela: Dias para lançar com a altura natural e Ações visualizadas ocupando
+     o resto, com barra de rolagem própria. */
+  .lateral { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); height: calc(100vh - 24px);
+             display: flex; flex-direction: column; }
+  .lateral [data-secao="vistos"] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .lateral [data-secao="vistos"].recolhido { flex: 0 0 auto; }
+  .lateral #vistos { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  @media (max-width: 900px) {
+    .leiaute { grid-template-columns: minmax(0, 1fr); }
+    .lateral { position: static; height: auto; }
+    .lateral #vistos { max-height: 420px; }
+  }
+  .secao.recolhido > :not(.cab), .secao.recolhido .so-aberto { display: none; }
+  .secao.recolhido > .cab { margin-bottom: 0; }
+  h2.cab { display: flex; align-items: center; gap: 8px; }
+  .esconder { margin-left: auto; text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--suave); }
+  .topo-cal .total-cal + .esconder { margin-left: 0; }
+  .lista .meio, .lista .quando, .bloco .desc, .bloco .titulo { overflow-wrap: anywhere; }
+  .lateral { overflow-x: hidden; }
+  .lateral .cartao { min-width: 0; }
+  .lateral .lista li { flex-wrap: wrap; }
+  /* Ações visualizadas: um grupo por tipo (issues, reuniões, sem issue), cada ação num cartão */
+  .vistos-intro { margin: -4px 0 14px; font-size: 13px; color: var(--suave); line-height: 1.45; }
+  .vistos-intro b { color: var(--texto); font-weight: 600; }
+  .grupo + .grupo { margin-top: 18px; }
+  .grupo-cab { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+               padding: 4px 0; background: var(--cartao); font-size: 12px; font-weight: 600; text-transform: uppercase;
+               letter-spacing: .6px; color: var(--suave); }
+  .grupo-cab i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .grupo-cab .qtd { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .grupo-cab .tot { margin-left: auto; color: var(--texto); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .grupo-dica { margin: -4px 0 8px; font-size: 12px; color: var(--suave); }
+  .itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .item { --cor: var(--marca); padding: 10px 12px; border-radius: 10px; background: var(--fundo);
+          border: 1px solid var(--linha); border-left: 3px solid var(--cor); }
+  .item.reuniao { --cor: var(--reuniao); } .item.sem { --cor: var(--sem); }
+  .item-topo { display: flex; align-items: center; gap: 8px; }
+  .item-topo .nome { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .item-topo .nome.chave { font-size: 13.5px; }
+  .item-topo .min { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .item .resumo { margin-top: 2px; font-size: 13px; line-height: 1.4; overflow: hidden; display: -webkit-box;
+                  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .item .onde { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .item .onde span { max-width: 100%; padding: 1px 8px; border-radius: 999px; background: var(--cartao);
+                     border: 1px solid var(--linha); font-size: 12px; color: var(--suave);
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .periodos { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12px; color: var(--suave);
+                    font-variant-numeric: tabular-nums; }
+  .item .periodos svg { flex: none; }
+  .item-pe { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .item .peso { flex: 1; height: 4px; border-radius: 2px; background: var(--linha); overflow: hidden; }
+  .item .peso span { display: block; height: 100%; border-radius: 2px; background: var(--cor); }
+  .item .mover { padding: 1px 10px; font-size: 12px; opacity: 0; transition: opacity .15s; }
+  .item:hover .mover, .item:focus-within .mover { opacity: 1; }
+  @media (hover: none) { .item .mover { opacity: 1; } }
+  .item .form-mover { display: flex; gap: 6px; margin-top: 8px; }
+  .item .form-mover input { flex: 1; min-width: 0; padding: 4px 8px; }
+  .grupo-mais { margin: 6px 0 0; font-size: 12px; color: var(--suave); }
+  .destaque { border: 2px solid var(--marca); box-shadow: 0 4px 18px rgba(61, 90, 254, .12); }
+  .destaque .topo-rascunho h2 { color: var(--marca); }
+  .agora-linha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: -4px 0 14px;
+                 border-radius: 10px; background: var(--fundo); border: 1px solid var(--linha); }
+  .agora-linha .rotulo { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); }
+  .agora-linha .texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .agora-linha strong { font-size: 16px; }
+  .agora-linha .motivo { color: var(--suave); }
+  .agora-linha .det { display: block; color: var(--suave); font-size: 13px; }
+  .corrigir { margin: -6px 0 14px; }
+  .selo.fixo { background: var(--marca-suave); color: var(--marca); margin-left: 6px; vertical-align: middle; }
+  .perguntas { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .perguntas li { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px;
+                  background: var(--fundo); border: 1px solid var(--linha); border-left: 4px solid var(--marca); }
+  .perguntas li.associar { border-left-color: var(--ok); }
+  .perguntas li.rotina { border-left-color: var(--reuniao); }
+  .perguntas .texto { flex: 1; min-width: 220px; overflow-wrap: anywhere; }
+  .perguntas .det { display: block; color: var(--suave); font-size: 13px; margin-top: 2px; }
+  .perguntas .botoes { display: flex; gap: 6px; }
+  .contagem { background: var(--marca); color: var(--cartao); border-radius: 999px; font-size: 12px; padding: 0 8px;
+              letter-spacing: 0; }
+  td.acoes { white-space: nowrap; }
+  td.acoes .excluir { color: var(--erro); margin-left: 4px; }
+  .desatualizado { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--marca-suave);
+                   color: var(--marca); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.icone { width: 40px; height: 40px; padding: 0; display: inline-grid; place-items: center; border-radius: 12px; color: var(--suave); }
+  button.icone:hover { color: var(--marca); }
+  .acoes-cal { display: inline-flex; gap: 6px; margin-left: auto; }
+  .topo-cal .total-cal { margin-left: 8px; }
+  .topo-cal .acoes-cal + .esconder { margin-left: 0; }
+  .rodape-cal { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-wrap: wrap;
+                margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linha); }
+  .rodape-cal .dica-sel { margin: 0 auto 0 0; }
+  header .divisor { width: 1px; align-self: stretch; background: var(--linha); margin: 0 2px; }
+  .nav-dia { display: inline-flex; gap: 4px; align-items: center; }
+  .nav-dia input { padding: 3px 8px; font-size: 13px; }
+  .foco-info { font-size: 13px; color: var(--suave); }
+  .opcao { display: flex !important; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 400 !important; }
+  .opcao input[type=time] { padding: 3px 6px; }
+  .atalhos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .foco-info b { color: var(--texto); font-family: Consolas, ui-monospace, monospace; font-weight: 600; }
+  .painel-sel .perigo { color: var(--erro); }
+  .painel-sel .perigo:hover { border-color: var(--erro); }
+  dialog.grande { width: min(1120px, 96vw); }
+  dialog.confirmar { width: min(440px, 94vw); text-align: center; }
+  dialog.confirmar .dialogo { padding: 26px 26px 20px; }
+  dialog.confirmar h2 { margin: 10px 0 6px; font-size: 19px; }
+  dialog.confirmar p { margin: 0; color: var(--suave); line-height: 1.5; }
+  .conf-icone { width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
+                background: var(--erro-suave); color: var(--erro); }
+  dialog.confirmar.neutro .conf-icone { background: var(--marca-suave); color: var(--marca); }
+  .conf-detalhe { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--fundo);
+                  border: 1px solid var(--linha); font-size: 14px; font-variant-numeric: tabular-nums; }
+  dialog.confirmar .acoes { justify-content: center; margin-top: 20px; }
+  dialog.confirmar .acoes button { min-width: 130px; }
+  button.perigo-cheio { background: var(--erro); border-color: var(--erro); color: #fff; font-weight: 600; }
+  button.perigo-cheio:hover { filter: brightness(1.08); border-color: var(--erro); }
+  dialog.confirmar.neutro button.perigo-cheio { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); }
+  .dialogo { padding: 22px; }
+  .topo-dialogo { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .topo-dialogo > :first-child { flex: 1; }
+  .topo-dialogo h2 { margin: 0; font-size: 20px; }
+  .topo-dialogo .sub { margin: 4px 0 0; }
+  .topo-dialogo .fechar { border: 0; background: transparent; color: var(--suave); font-size: 22px; line-height: 1; padding: 2px 8px; }
+  .topo-rascunho .espaco { flex: 1; }
+  .texto-privacidade { max-height: 70vh; overflow-y: auto; line-height: 1.55; }
+  .texto-privacidade h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); margin: 18px 0 6px; }
+  .texto-privacidade ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+  .texto-privacidade .destaque-texto { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--marca-suave); }
+  .texto-privacidade .programas { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+  .texto-privacidade .programas span { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--fundo); border: 1px solid var(--linha); }
+  .salvo { font-size: 13px; color: var(--suave); margin-right: auto; }
+  .total + .salvo { margin-left: -4px; }
+  td .sugestoes { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  td .sugestoes button { padding: 1px 7px; font-size: 12px; border-style: dashed; color: var(--marca);
+                         font-family: Consolas, ui-monospace, monospace; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: .5px; }
+  header .data { color: var(--suave); }
+  header .espaco { flex: 1; }
+  .pilula { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+            font-size: 13px; background: var(--cartao); border: 1px solid var(--linha); }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--sem); }
+  .ponto.ativo { background: var(--ok); } .ponto.reuniao { background: var(--reuniao); } .ponto.ausente { background: var(--alerta); }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--linha); background: var(--cartao);
+           color: var(--texto); padding: 7px 14px; cursor: pointer; }
+  button:hover { border-color: var(--marca); }
+  button.primario { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); }
+
+  button:disabled { opacity: .5; cursor: default; }
+  button.pequeno { padding: 3px 8px; font-size: 13px; }
+  input, select { font: inherit; color: var(--texto); background: var(--fundo); border: 1px solid var(--linha);
+                  border-radius: 8px; padding: 7px 10px; min-width: 0; }
+  input:focus { outline: 2px solid var(--marca-suave); border-color: var(--marca); }
+  .cartao { background: var(--cartao); border: 1px solid var(--linha); border-radius: 14px; padding: 18px; }
+  .cartao h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); margin: 0 0 12px; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 16px; }
+  .contador { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .contador .grande { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .contador .de { color: var(--suave); font-size: 18px; }
+  .contador .horario { margin-left: auto; color: var(--suave); font-size: 14px; }
+  .lista .quando { display: block; color: var(--suave); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .lista .meio { flex: 1; min-width: 0; }
+  .barra { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--fundo);
+           border: 1px solid var(--linha); margin: 12px 0 8px; }
+  .barra span { height: 100%; }
+  .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--suave); }
+  .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .lista { list-style: none; margin: 0; padding: 0; }
+  .lista li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--linha); }
+  .lista li:first-child { border-top: 0; }
+  .lista .min { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--suave); white-space: nowrap; }
+  .chave { font-family: Consolas, ui-monospace, monospace; font-size: 13px; }
+  .vazio { color: var(--suave); font-style: italic; }
+  .foco-atual { font-size: 20px; font-weight: 600; margin-bottom: 10px; }
+  .linha-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .linha-form input { flex: 1; }
+  .selo { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .selo.pendente { background: var(--erro-suave); color: var(--erro); }
+  .selo.rascunho { background: var(--alerta-suave); color: var(--alerta); }
+  .selo.aprovado { background: var(--marca-suave); color: var(--marca); }
+  .selo.lancado, .selo.publicado { background: var(--ok-suave); color: var(--ok); }
+  .topo-cal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .topo-cal h2 { margin: 0 8px 0 0; }
+  .topo-cal .total-cal { margin-left: auto; font-weight: 600; color: var(--marca); }
+  .alternar { display: inline-flex; border: 1px solid var(--linha); border-radius: 8px; overflow: hidden; }
+  .alternar button { border: 0; border-radius: 0; padding: 4px 12px; font-size: 13px; }
+  .alternar button.ativo { background: var(--marca-suave); color: var(--marca); font-weight: 600; }
+  .cal-rolagem { padding-top: 10px; border-top: 2px solid var(--marca); }  /* cresce com o dia, sem barra própria */
+  .cal { position: relative; margin-left: 52px; }
+  .cal .hora { position: absolute; left: -52px; width: 44px; text-align: right; font-size: 12px; color: var(--suave);
+               transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+  .cal .grade-hora { position: absolute; left: 0; right: 0; border-top: 1px solid var(--linha); }
+  .cal .meia { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--linha); opacity: .5; }
+  .bloco { position: absolute; left: 8px; right: 8px; gap: 2px; background: var(--cartao); border: 1px solid var(--linha);
+           border-left: 4px solid var(--marca); border-radius: 8px; padding: 6px 12px; overflow: hidden;
+           display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .bloco.reuniao { border-left-color: var(--reuniao); }
+  .bloco.sem { border-left-color: var(--sem); border-style: dashed; border-left-style: solid; }
+  .bloco .titulo { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bloco .desc { color: var(--suave); font-size: 13px; overflow: hidden; display: -webkit-box;
+                 -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; }
+  .bloco .pe { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-top: auto; }
+  .bloco .pe .chave { color: var(--suave); }
+  .bloco .pe b { font-size: 13px; }
+  .bloco.compacto { flex-direction: row; align-items: center; gap: 8px; padding-block: 0; }
+  .bloco.compacto .titulo { flex: 1; font-size: 13px; }
+  .bloco.compacto .desc, .bloco.compacto .pe .chave { display: none; }
+  .bloco.compacto .pe { margin: 0; }
+  .cal.editavel .bloco { cursor: pointer; }
+  .cal.editavel .bloco:hover { border-color: var(--marca); }
+  .bloco.selecionado { outline: 2px solid var(--marca); outline-offset: 1px; background: var(--marca-suave); z-index: 2; }
+  .painel-sel { display: grid; gap: 14px; padding: 16px 18px; margin-bottom: 12px; border-radius: 12px;
+                background: var(--cartao); border: 1px solid var(--linha); border-top: 3px solid var(--marca);
+                box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  .sel-topo { display: flex; align-items: flex-start; gap: 12px; }
+  .sel-topo > div { flex: 1; min-width: 0; }
+  .sel-titulo { font-size: 16px; font-weight: 650; }
+  .sel-meta { color: var(--suave); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .sel-blocos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sel-blocos span { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--fundo);
+                     border: 1px solid var(--linha); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sel-blocos span.reuniao { border-color: var(--reuniao); }
+  .painel-sel .fechar { border: 0; background: transparent; color: var(--suave); font-size: 20px; line-height: 1; padding: 2px 8px; }
+  .painel-sel .fechar:hover { color: var(--texto); }
+  .sel-campo { display: grid; gap: 6px; }
+  .sel-campo label { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); font-weight: 600; }
+  .sel-campo .linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .sel-campo input { width: min(280px, 100%); font-family: Consolas, ui-monospace, monospace; }
+  .sel-campo input[type=time] { width: auto; }
+  .painel-sel .sugestoes { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .painel-sel .sugestoes .rot { font-size: 12px; color: var(--suave); }
+  .painel-sel .sugestoes button { padding: 3px 10px; font-size: 13px; border-radius: 999px; background: var(--marca-suave);
+                                  border-color: transparent; color: var(--marca); }
+  .painel-sel .sugestoes button small { opacity: .75; margin-left: 4px; }
+  .sel-rodape { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--linha); }
+  .sel-rodape .espaco { flex: 1; }
+  .sel-rodape .check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--suave); }
+  .painel-sel .fantasma { background: transparent; border-color: transparent; color: var(--suave); }
+  .painel-sel .fantasma:hover { color: var(--texto); border-color: var(--linha); }
+  .dica-sel { color: var(--suave); font-size: 12px; margin: 0 0 8px; }
+  .pausa-cal { position: absolute; left: 4px; right: 4px; border-radius: 6px; color: var(--suave); font-size: 12px;
+               display: flex; align-items: center; justify-content: center;
+               background: repeating-linear-gradient(135deg, transparent 0 6px, var(--linha) 6px 7px); }
+  .agora { position: absolute; left: -8px; right: 0; border-top: 2px solid var(--marca); }
+  .agora span { position: absolute; left: 50%; transform: translate(-50%, -55%); background: var(--cartao);
+                color: var(--marca); font-size: 12px; padding: 0 6px; }
+  .dias li { cursor: pointer; } .dias li:hover { color: var(--marca); }
+  section.rascunho { margin-top: 16px; }
+  .topo-rascunho { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .topo-rascunho h2 { margin: 0 8px 0 0; }
+  .tabela { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 620px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--suave);
+       font-weight: 600; padding: 6px; border-bottom: 1px solid var(--linha); }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--linha); }
+  td input { width: 100%; }
+  td.tempo input { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+  td.horario { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 14px; }
+  td.horario span { display: block; }
+  td.origem { color: var(--suave); font-size: 13px; }
+  .rodape-rascunho { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .total { font-weight: 600; margin-right: auto; }
+  .problemas { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--alerta-suave); color: var(--alerta); }
+  .problemas:empty { display: none; }
+  .problemas p { margin: 2px 0; }
+  .aviso { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 10px 18px; border-radius: 10px;
+           background: var(--texto); color: var(--fundo); box-shadow: 0 6px 24px rgba(0,0,0,.2); max-width: 90vw; }
+  .aviso.erro { background: var(--erro); color: #fff; }
+  dialog { border: 1px solid var(--linha); border-radius: 16px; padding: 0; width: min(560px, 94vw);
+           background: var(--cartao); color: var(--texto); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog form { padding: 22px; }
+  dialog h2 { margin: 0 0 4px; font-size: 20px; }
+  dialog .sub { color: var(--suave); margin: 0 0 18px; }
+  .campo { display: grid; gap: 4px; margin-bottom: 14px; }
+  .campo label { font-weight: 600; font-size: 14px; }
+  .campo small { color: var(--suave); }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .dupla { grid-template-columns: 1fr; } }
+  .agenda-box { border: 1px dashed var(--linha); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+  .acoes { display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>TrampoTime</h1>
+    <span class="data" id="hoje"></span>
+    <span class="pilula" id="observador"><span class="ponto"></span><span>carregando…</span></span>
+    <span class="espaco"></span>
+    <button class="icone" id="alternarTema" title="Mudar o tema" aria-label="Mudar o tema"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button class="icone" id="abrirPrivacidade" title="Privacidade e segurança" aria-label="Privacidade e segurança"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+    <button class="icone" id="abrirConfig" title="Configuração" aria-label="Configuração"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </header>
+
+  <div class="leiaute" id="leiaute">
+  <div class="principal">
+    <div class="cartao secao" data-secao="hoje">
+      <h2 class="cab">Hoje até agora</h2>
+      <div class="agora-linha" aria-live="polite">
+        <span class="ponto" id="agoraPonto"></span>
+        <span class="rotulo">Agora</span>
+        <span class="texto"><strong id="agoraChave">…</strong> <span class="motivo" id="agoraMotivo"></span>
+          <span class="det" id="agoraDetalhe"></span></span>
+        <span class="foco-info" id="focoAtual"></span>
+        <button type="button" class="pequeno" id="limparFoco" hidden>Limpar foco</button>
+        <button type="button" class="pequeno" id="naoEIsso">Não é isso</button>
+        <button type="button" class="pequeno primario" id="encerrarReserva" hidden>Encerrar reserva</button>
+      </div>
+      <form class="linha-form corrigir" id="formCorrigir" hidden>
+        <input id="campoCorrigir" list="sugestoes" placeholder="Issue certa, ex. DMANESTOQ-15684 - Nome" autocomplete="off" aria-label="Issue certa">
+        <button class="primario">Corrigir e fixar</button>
+        <button type="button" id="cancelarCorrigir">Cancelar</button>
+      </form>
+      <div class="contador"><span class="grande" id="observado">0h00</span><span class="de" id="jornada">de 7h30</span><span class="horario" id="horario"></span></div>
+      <div class="barra" id="barra"></div>
+      <div class="legenda" id="legenda"></div>
+      <div class="legenda" id="pausas" style="margin-top:8px"></div>
+    </div>
+
+    <section class="cartao secao" data-secao="perguntas" id="cardPerguntas" hidden>
+      <h2 class="cab">Perguntas do TrampoTime <span class="contagem" id="contagemPerguntas"></span></h2>
+      <ul class="perguntas" id="perguntas"></ul>
+    </section>
+
+    <section class="cartao secao destaque" data-secao="historico">
+      <div class="topo-cal cab">
+        <h2 id="tituloCal">Histórico do dia</h2>
+        <span class="nav-dia so-aberto">
+          <button type="button" class="pequeno" id="diaAnterior" aria-label="Dia anterior">◀</button>
+          <input type="date" id="diaHistorico" aria-label="Dia do histórico">
+          <button type="button" class="pequeno" id="diaProximo" aria-label="Próximo dia">▶</button>
+          <button type="button" class="pequeno" id="diaHoje">Hoje</button>
+        </span>
+        <span class="alternar so-aberto" role="group" aria-label="O que mostrar">
+          <button type="button" id="verObservado" class="ativo">Observado</button>
+          <button type="button" id="verPlanilha">Planilha</button>
+        </span>
+        <span class="total-cal" id="totalCal"></span>
+        <span class="acoes-cal so-aberto">
+          <button type="button" class="pequeno" id="abrirReserva">Reservar horário</button>
+          <button type="button" class="pequeno" id="exportar">Exportar</button>
+        </span>
+        <button type="button" class="pequeno esconder" aria-expanded="true">Esconder</button>
+      </div>
+      <div class="corpo">
+        <p class="dica-sel" id="dicaSel">Clique num bloco para trocar a issue, ajustar o horário, juntar com o vizinho ou excluir. Ctrl + clique seleciona vários para juntar.</p>
+        <form class="painel-sel" id="painelSel" hidden>
+          <div class="sel-topo">
+            <div>
+              <div class="sel-titulo" id="selTitulo"></div>
+              <div class="sel-meta" id="selResumo"></div>
+              <div class="sel-blocos" id="selBlocos"></div>
+            </div>
+            <button type="button" class="fechar" id="selFechar" aria-label="Fechar">×</button>
+          </div>
+          <div class="sel-campo" id="selHorario">
+            <label for="selDe">Horário</label>
+            <div class="linha">
+              <input type="time" id="selDe" aria-label="Início"> até <input type="time" id="selAte" aria-label="Fim">
+              <span class="sel-meta">Encolher tira o tempo das pontas; esticar passa o tempo novo para este bloco.</span>
+            </div>
+          </div>
+          <div class="sel-campo">
+            <label for="selChave">Issue de destino</label>
+            <div class="linha">
+              <input id="selChave" list="sugestoes" placeholder="DMANESTOQ-15770" autocomplete="off">
+              <span class="sugestoes" id="selSugestoes"></span>
+            </div>
+          </div>
+          <div class="sel-rodape">
+            <label class="check" id="selReunioesRot"><input type="checkbox" id="selReunioes"> incluir reuniões do meio</label>
+            <button type="button" class="fantasma" id="selAnterior">← Juntar com o anterior</button>
+            <button type="button" class="fantasma" id="selProximo">Juntar com o próximo →</button>
+            <span class="espaco"></span>
+            <button type="button" class="fantasma perigo" id="selExcluir">Excluir</button>
+            <button type="button" class="fantasma" id="selCancelar">Cancelar</button>
+            <button class="primario" id="selAplicar">Aplicar</button>
+          </div>
+        </form>
+        <div class="cal-rolagem"><div class="cal" id="calendario"></div></div>
+        <div class="rodape-cal">
+          <span class="dica-sel">Confira o dia, ajuste o que precisar e valide para lançar no Tempo.</span>
+          <button class="primario" id="abrirValidar">Validar dia</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="lateral" id="lateral" aria-label="Painel lateral">
+    <div class="cartao secao" data-secao="dias">
+      <h2 class="cab">Dias para lançar</h2>
+      <ul class="lista dias" id="dias"></ul>
+    </div>
+    <div class="cartao secao" data-secao="vistos">
+      <h2 class="cab">Ações visualizadas</h2>
+      <p class="vistos-intro">Onde o seu tempo foi hoje, do que mais tomou tempo ao que menos tomou. Passe o mouse num item e use <b>Mover</b> para mandar tudo dele para outra issue.</p>
+      <div id="vistos"></div>
+    </div>
+  </aside>
+  </div>
+  <datalist id="sugestoes"></datalist>
+</main>
+
+<dialog id="validar" class="grande" aria-labelledby="tituloValidar">
+  <div class="dialogo">
+    <div class="topo-dialogo">
+      <div>
+        <h2 id="tituloValidar">Validar o dia</h2>
+        <p class="sub">Confira as linhas que vão para o Tempo, aprove e, depois de lançar, marque como lançado.</p>
+      </div>
+      <button type="button" class="fechar" id="fecharValidar" aria-label="Fechar">×</button>
+    </div>
+    <section class="rascunho">
+      <div class="topo-rascunho">
+        <input type="date" id="diaRascunho" hidden>
+        <span id="statusDia"></span>
+        <span class="espaco"></span>
+        <button class="primario" id="gerar">Gerar rascunho</button>
+        <button type="button" id="limpar">Limpar</button>
+        <a id="baixarCsv" href="#"><button type="button">Baixar CSV</button></a>
+      </div>
+      <div class="tabela">
+        <table>
+          <thead><tr><th style="width:210px">Issue</th><th>Descrição</th><th>Tempo</th><th>Início – fim</th><th>Origem</th><th></th></tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <div class="desatualizado" id="desatualizado" hidden>
+        <span>O histórico mudou desde que esta planilha foi gerada.</span>
+        <button type="button" class="pequeno primario" id="atualizarPlanilha">Atualizar do histórico</button>
+      </div>
+      <div class="problemas" id="problemas"></div>
+      <div class="rodape-rascunho">
+        <span class="total" id="total"></span>
+        <span class="salvo" id="salvoEm" role="status"></span>
+        <button id="addLinha">+ Linha</button>
+        <button id="aprovar">Aprovar</button>
+        <button class="primario" id="lancado">Marquei no Tempo</button>
+      </div>
+    </section>
+  </div>
+</dialog>
+
+<dialog id="reserva" aria-labelledby="tituloReserva">
+  <form class="dialogo" id="formReserva">
+    <div class="topo-dialogo">
+      <div>
+        <h2 id="tituloReserva">Reservar horário</h2>
+        <p class="sub">Para quando você está trabalhando longe do computador: uma retrospectiva, ajudando um colega no presencial.
+          O tempo conta como trabalho mesmo sem mexer no computador.</p>
+      </div>
+      <button type="button" class="fechar" id="fecharReserva" aria-label="Fechar">×</button>
+    </div>
+    <div class="campo">
+      <label>Quando</label>
+      <label class="opcao"><input type="radio" name="quando" value="agora" checked> Agora, até eu voltar (encerro no card Agora)</label>
+      <label class="opcao"><input type="radio" name="quando" value="intervalo"> Um horário de hoje
+        <input type="time" id="resDe" aria-label="Início"> até <input type="time" id="resAte" aria-label="Fim"></label>
+    </div>
+    <div class="campo">
+      <label for="resDescricao">O que você está fazendo</label>
+      <div class="atalhos" id="resAtalhos">
+        <button type="button" class="pequeno">Reunião sem computador</button>
+        <button type="button" class="pequeno">Retrospectiva</button>
+        <button type="button" class="pequeno">Ajudando um colega</button>
+        <button type="button" class="pequeno">Treinamento</button>
+      </div>
+      <input id="resDescricao" placeholder="Ex.: Ajudando o colega com o pacote de estoque" required>
+    </div>
+    <div class="campo">
+      <label for="resChave">Issue (opcional)</label>
+      <input id="resChave" list="sugestoes" placeholder="DMANESTOQ-15770" autocomplete="off">
+      <small>Sem issue, a reserva vai para a issue de reuniões da configuração, ou você escolhe ao validar o dia.</small>
+    </div>
+    <div class="acoes">
+      <button type="button" id="cancelarReserva">Cancelar</button>
+      <button class="primario">Reservar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmacao" class="confirmar" aria-labelledby="confTitulo" aria-describedby="confTexto">
+  <div class="dialogo">
+    <div class="conf-icone" id="confIcone"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></div>
+    <h2 id="confTitulo"></h2>
+    <p id="confTexto"></p>
+    <div class="conf-detalhe" id="confDetalhe" hidden></div>
+    <div class="acoes">
+      <button type="button" id="confCancelar">Cancelar</button>
+      <button type="button" class="perigo-cheio" id="confOk"></button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="privacidade" aria-labelledby="tituloPrivacidade">
+  <div class="dialogo">
+    <div class="topo-dialogo">
+      <h2 id="tituloPrivacidade">Privacidade e segurança</h2>
+      <button type="button" class="fechar" id="fecharPrivacidade" aria-label="Fechar">×</button>
+    </div>
+    <div class="texto-privacidade">
+      <p class="destaque-texto">O TrampoTime é uma ferramenta de apoio para você, desenvolvedor, organizar o seu dia e não esquecer de
+        lançar as horas. Não é monitoramento: os dados são seus, ficam no seu computador e ninguém mais tem acesso a eles.</p>
+
+      <h3>O que ele observa</h3>
+      <ul>
+        <li>O <b>título da janela</b> em que você está (ou sob o mouse, na segunda tela), a cada poucos segundos.</li>
+        <li>Se o <b>microfone</b> está em uso pelo navegador, Teams ou Zoom, só para saber que você está numa chamada. Nada é gravado do áudio.</li>
+        <li>Se a tela está bloqueada, o computador suspenso ou se não há teclado e mouse há alguns minutos (pausas).</li>
+      </ul>
+
+      <h3>O que ele nunca faz</h3>
+      <ul>
+        <li>Não lê o conteúdo de documentos, planilhas, e-mails ou conversas.</li>
+        <li>Não registra o que você digita, não tira print da tela e não grava áudio.</li>
+        <li>Não envia nada para a internet. Não fala com o Jira nem com o Tempo no modo planilha: quem lança as horas é você.</li>
+      </ul>
+
+      <h3>O que fica guardado</h3>
+      <ul>
+        <li>Do título das janelas, só o necessário: a chave e o resumo da issue (aba do Jira), o nome da reunião,
+          o nome da VM e a pasta e a branch do VS Code. O resto do título é descartado na hora.</li>
+        <li>O título completo só é guardado nos programas e abas que você configurou:
+          <span id="privProgramas" class="programas"></span></li>
+        <li>Tudo fica no arquivo <code>trampotime.db</code>, na pasta do TrampoTime, no seu computador.</li>
+      </ul>
+
+      <h3>Por quanto tempo</h3>
+      <ul>
+        <li>O detalhe do dia (as observações a cada poucos segundos) é apagado <span id="privDias">5 dias</span> depois
+          que o dia é marcado como lançado. Dias ainda não lançados ficam até você lançar.</li>
+        <li>Ficam guardadas a planilha de cada dia (issue, descrição e tempo) e um resumo compacto de uso
+          (atividade, issue e minutos), que o TrampoTime usa para aprender suas rotinas. Conversas do Chat ficam fora desse resumo.</li>
+      </ul>
+
+      <h3>Você controla</h3>
+      <ul>
+        <li>Mude a lista de programas e o tempo de histórico em <b>Configuração</b>.</li>
+        <li>Exclua qualquer trecho no Histórico do dia, ou limpe a planilha de um dia.</li>
+        <li>Para apagar tudo, feche o TrampoTime e apague o arquivo <code>trampotime.db</code>.</li>
+      </ul>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="config">
+  <form method="dialog" id="formConfig">
+    <h2>Configuração</h2>
+    <p class="sub">O TrampoTime usa isso para reconhecer suas issues e fechar o dia.</p>
+    <div class="campo">
+      <label for="cProjetos">Projetos do Jira</label>
+      <input id="cProjetos" placeholder="DMANESTOQ, DMANFAT" required>
+      <small>Prefixos das chaves, separados por vírgula. Evita confundir "UTF-8" com issue.</small>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label for="cJornada">Jornada</label><input id="cJornada" placeholder="7h30" required></div>
+      <div class="campo"><label for="cInicio">Início do dia</label><input id="cInicio" type="time" required></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label for="cBloco">Arredondar em</label>
+        <select id="cBloco"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option></select></div>
+      <div class="campo"><label for="cOcioso">Ausente depois de</label>
+        <select id="cOcioso"><option value="3">3 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option></select></div>
+    </div>
+    <div class="campo">
+      <label for="cReunioes">Issue para reuniões sem chave</label>
+      <input id="cReunioes" placeholder="DMANESTOQ-1 (vazio: você escolhe na revisão)">
+    </div>
+    <div class="campo">
+      <label for="cIgnorar">Eventos da agenda a ignorar</label>
+      <input id="cIgnorar" placeholder="Almoço, Bloqueio, Foco">
+    </div>
+    <div class="campo">
+      <label for="cManter">Guardar o detalhe dos dias lançados por</label>
+      <select id="cManter"><option value="3">3 dias</option><option value="5">5 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select>
+      <small>Depois disso fica só a planilha do dia.</small>
+    </div>
+    <div class="campo">
+      <label for="cGuardar">Guardar o título destes apps e abas</label>
+      <input id="cGuardar" placeholder="EXCEL.EXE, WINWORD.EXE, - Chat, Google Vids">
+      <small>App pelo nome do .exe ou aba por parte do título, separados por vírgula. De todo o resto o TrampoTime guarda só o nome da reunião, o resumo da aba do Jira e o nome da VM.</small>
+    </div>
+    <div class="campo">
+      <label><input type="checkbox" id="cAvisos"> Avisos do Windows</label>
+      <small>Notifica quando passar 15 min sem issue, quando a jornada fechar e quando um dia anterior não foi lançado.</small>
+    </div>
+    <div class="agenda-box">
+      <strong>Reuniões</strong>
+      <p id="agendaTexto" style="margin:6px 0 10px"></p>
+      <button type="button" id="conectarAgenda">Conectar Google Agenda</button>
+    </div>
+    <div class="acoes">
+      <button type="button" id="fecharConfig">Cancelar</button>
+      <button class="primario" id="salvarConfig">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+let estado = null, rascunho = null, editado = false;
+
+async function api(metodo, caminho, corpo) {
+  const r = await fetch(caminho, {
+    method: metodo,
+    headers: { "X-TrampoTime": "1", ...(corpo !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+  });
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof dados.detail === "string" ? dados.detail : "Algo deu errado.");
+  return dados;
+}
+
+function hhmm(min) { min = Math.round(min); return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`; }
+function paraMinutos(texto) {
+  const v = String(texto).toLowerCase().replace(/\s/g, "");
+  if (v.includes("h")) { const [h, m] = v.split("h"); return (+h || 0) * 60 + (+m || 0); }
+  if (v.includes(":")) { const [h, m] = v.split(":"); return (+h || 0) * 60 + (+m || 0); }
+  return Math.round(+v.replace(",", ".")) || 0;
+}
+function dataBonita(iso) {
+  return new Date(iso + "T12:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+function avisar(texto, erro = false) {
+  const a = document.createElement("div");
+  a.className = "aviso" + (erro ? " erro" : ""); a.textContent = texto; a.setAttribute("role", "status");
+  (document.querySelector("dialog[open]") || document.body).appendChild(a); setTimeout(() => a.remove(), erro ? 6000 : 3000);
+}
+async function tentar(fn) { try { return await fn(); } catch (e) { avisar(e.message, true); } }
+const NOMES_STATUS = { pendente: "pendente", rascunho: "rascunho", aprovado: "aprovado", lancado: "lançado", publicado: "enviado" };
+function selo(status) { return `<span class="selo ${status}">${NOMES_STATUS[status] || status}</span>`; }
+function esc(t) { return String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Estado geral (contador, foco, dias)
+
+async function atualizar() {
+  estado = await api("GET", "/estado");
+  const at = estado.atividade, obs = estado.observador;
+  $("hoje").textContent = new Date(estado.hoje + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  $("observado").textContent = hhmm(at.observado_minutos);
+  $("jornada").textContent = `de ${hhmm(at.jornada_minutos)}`;
+  $("horario").textContent = at.inicio ? `Início ${at.inicio} · última atividade ${at.fim}` : "";
+  const MOTIVOS = { bloqueado: "tela bloqueada", suspenso: "computador suspenso", ausente: "ausente" };
+  $("pausas").innerHTML = at.pausas.length
+    ? `<span>Pausas ${hhmm(at.pausa_minutos)}:</span> ` + at.pausas.map(p =>
+        `<span title="${MOTIVOS[p.motivo] || p.motivo}">${p.inicio}–${p.fim} ${MOTIVOS[p.motivo] || p.motivo} (${hhmm(p.minutos)})</span>`).join("")
+    : "";
+
+  const pilula = $("observador"), ponto = pilula.querySelector(".ponto"), texto = pilula.querySelector("span:last-child");
+  ponto.className = "ponto";
+  if (!obs.ativo) texto.textContent = "observador desligado";
+  else if (obs.bloqueado) { ponto.classList.add("ausente"); texto.textContent = "tela bloqueada"; }
+  else if (obs.ausente) { ponto.classList.add("ausente"); texto.textContent = "ausente"; }
+  else if (obs.reuniao) { ponto.classList.add("reuniao"); texto.textContent = "em reunião"; }
+  else { ponto.classList.add("ativo"); texto.textContent = obs.chave ? `observando · ${obs.chave}` : "observando"; }
+
+  const ticketMin = at.tickets.reduce((s, t) => s + t.minutos, 0);
+  const reuniaoMin = at.reunioes.reduce((s, r) => s + r.minutos, 0);
+  const semMin = Math.max(at.observado_minutos - ticketMin - reuniaoMin, 0);
+  const base = Math.max(at.jornada_minutos, at.observado_minutos, 1);
+  $("barra").innerHTML = [["var(--marca)", ticketMin], ["var(--reuniao)", reuniaoMin], ["var(--sem)", semMin]]
+    .map(([cor, m]) => `<span style="width:${100 * m / base}%;background:${cor}"></span>`).join("");
+  $("legenda").innerHTML = `<span><i style="background:var(--marca)"></i>Issues ${hhmm(ticketMin)}</span>
+    <span><i style="background:var(--reuniao)"></i>Reuniões ${hhmm(reuniaoMin)}</span>
+    <span><i style="background:var(--sem)"></i>Sem issue ${hhmm(semMin)}</span>
+    <span>Faltam ${hhmm(Math.max(at.jornada_minutos - at.observado_minutos, 0))}</span>`;
+
+  $("focoAtual").innerHTML = estado.foco ? `Foco: <b>${esc(estado.foco)}</b>${estado.fixo ? ' <span class="selo fixo" title="Ganha até da chave no título. Limpe para voltar ao normal.">fixado</span>' : ""}` : "";
+  $("limparFoco").hidden = !estado.foco;
+  if (!diaSel || diaSel === estado.hoje) atividadeCal = estado.atividade;
+  const chaves = new Set(at.tickets.map(t => t.chave));
+  if (estado.foco) chaves.add(estado.foco);
+  const nomes = { ...Object.fromEntries(at.tickets.map(t => [t.chave, t.resumo])), ...(estado.issues || {}) };
+  Object.keys(estado.issues || {}).forEach(c => chaves.add(c));
+  $("sugestoes").innerHTML = [...chaves].map(c => `<option value="${esc(c)}" label="${esc(nomes[c] && nomes[c] !== c ? nomes[c] : "")}">`).join("")
+    + estado.preferencias.projetos.map(p => `<option value="${esc(p)}-">`).join("");
+
+  if (!$("vistos").querySelector(".form-mover")) {  // não redesenha enquanto você escolhe o destino
+    $("vistos").innerHTML = acoesVistas(at);
+  }
+
+  desenharCalendario();
+  atualizarPerguntas().catch(() => {});
+
+  $("dias").innerHTML = estado.dias.map(d =>
+    `<li data-dia="${d.data}"><span>${dataBonita(d.data)}</span><span class="min">${selo(d.status)}</span></li>`).join("");
+}
+
+// Ações visualizadas: issues, reuniões e sem issue em grupos, cada ação com nome, onde, quando e o peso no dia
+const RELOGIO = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+const SEM_ISSUE_VISIVEIS = 5;
+
+function acoesVistas(at) {
+  const maior = Math.max(1, ...at.tickets.map(t => t.minutos), ...at.reunioes.map(r => r.minutos), ...at.sem_ticket.map(a => a.minutos));
+  const quando = ps => {
+    if (!ps.length) return "";
+    const txt = ps.map(([i, f]) => i === f ? i : `${i}–${f}`);
+    return `<div class="periodos" title="${esc(txt.join(", "))}">${RELOGIO}<span>${txt.slice(0, 3).join(" · ")}${txt.length > 3 ? ` · +${txt.length - 3}` : ""}</span></div>`;
+  };
+  const onde = lugares => lugares.length
+    ? `<div class="onde">${lugares.slice(0, 3).map(l => `<span title="${esc(l)}">${esc(l)}</span>`).join("")}${lugares.length > 3 ? `<span title="${esc(lugares.slice(3).join(" · "))}">+${lugares.length - 3}</span>` : ""}</div>`
+    : "";
+  const item = ({ tipo, nome, chave, resumo, lugares = [], periodos, minutos }) => `<li class="item ${tipo}">
+      <div class="item-topo"><span class="nome${chave ? " chave" : ""}">${esc(nome)}</span><span class="min">${hhmm(minutos)}</span></div>
+      ${resumo ? `<div class="resumo" title="${esc(resumo)}">${esc(resumo)}</div>` : ""}
+      ${onde(lugares)}${quando(periodos)}
+      <div class="item-pe"><span class="peso" title="${Math.round(100 * minutos / Math.max(at.observado_minutos, 1))}% do tempo observado hoje"><span style="width:${100 * minutos / maior}%"></span></span>
+        <button type="button" class="pequeno mover" data-tipo="${tipo === "ticket" ? "ticket" : tipo === "reuniao" ? "reuniao" : "sem"}" data-nome="${esc(chave || nome)}" title="Mandar todo o tempo de hoje deste item para outra issue">Mover</button></div>
+    </li>`;
+  const grupo = (titulo, cor, dica, lista, extra = "") => {
+    if (!lista.length) return "";
+    const total = lista.reduce((s, x) => s + x.minutos, 0);
+    return `<section class="grupo"><h3 class="grupo-cab"><i style="background:${cor}"></i>${titulo} <span class="qtd">(${lista.length})</span><span class="tot">${hhmm(total)}</span></h3>
+      ${dica ? `<p class="grupo-dica">${dica}</p>` : ""}<ul class="itens">${lista.map(item).join("")}</ul>${extra}</section>`;
+  };
+  const sem = at.sem_ticket;
+  const porTempo = lista => [...lista].sort((a, b) => b.minutos - a.minutos);
+  const html = [
+    grupo("Issues", "var(--marca)", "", porTempo(at.tickets).map(t => ({ tipo: "ticket", nome: t.chave, chave: t.chave,
+      resumo: t.resumo === t.chave ? "" : t.resumo, lugares: t.onde, periodos: t.periodos, minutos: t.minutos }))),
+    grupo("Reuniões", "var(--reuniao)", "", porTempo(at.reunioes).map(r => ({ tipo: "reuniao", nome: r.titulo, periodos: r.periodos, minutos: r.minutos }))),
+    grupo("Sem issue", "var(--sem)", "Tempo em apps sem chave de issue. Mova para a issue certa para ele entrar na planilha.",
+      sem.slice(0, SEM_ISSUE_VISIVEIS).map(a => ({ tipo: "sem", nome: a.app, periodos: a.periodos, minutos: a.minutos })),
+      sem.length > SEM_ISSUE_VISIVEIS ? `<p class="grupo-mais">e mais ${sem.length - SEM_ISSUE_VISIVEIS} apps com pouco tempo (${hhmm(sem.slice(SEM_ISSUE_VISIVEIS).reduce((s, a) => s + a.minutos, 0))})</p>` : ""),
+  ].join("");
+  return html || `<p class="vazio">Nada observado ainda hoje.</p>`;
+}
+
+$("dias").addEventListener("click", e => {
+  const li = e.target.closest("li[data-dia]");
+  if (li) { irParaDia(li.dataset.dia); document.querySelector('[data-secao="historico"]').scrollIntoView({ behavior: "smooth" }); }
+});
+
+// Calendário do dia (como a visão diária do Tempo)
+
+let modoCal = "observado";
+const PX_MIN = 1.8;  // altura de 1 minuto (1h = 108 px)
+const paraMin = t => { const [h, m] = t.split(":"); return +h * 60 + +m; };
+
+function blocosObservados() {
+  if (!atividadeCal) return [];
+  const resumo = Object.fromEntries(atividadeCal.tickets.map(t => [t.chave, t.resumo]));
+  return atividadeCal.historico.filter(b => b.minutos >= 5).map(b => ({
+    inicio: b.inicio, fim: b.fim, de: b.de, ate: b.ate, tipo: b.tipo, minutos: b.minutos,
+    titulo: b.tipo === "ticket" ? b.nome
+      : b.tipo === "reuniao" ? b.nome : "Sem issue",
+    // issue: o nome (o que você digitou ou o resumo do Jira) vem antes dos documentos abertos
+    descricao: [b.tipo === "ticket" && resumo[b.nome] && resumo[b.nome] !== b.nome ? resumo[b.nome] : "", ...b.detalhes].filter(Boolean).join(" · "),
+    chave: b.tipo === "ticket" ? b.nome : "",
+  }));
+}
+
+function blocosDaPlanilha() {
+  if (!rascunho) return [];
+  const linhas = linhasDaTela();
+  const trechos = [...$("linhas").querySelectorAll("tr[data-origem]")].map((tr, i) =>
+    [...tr.querySelectorAll("td.horario span")].map(s => s.textContent.split(" – ")));
+  return linhas.flatMap((l, i) => (trechos[i] || []).map(([inicio, fim]) => ({
+    inicio, fim, minutos: paraMin(fim) - paraMin(inicio),
+    tipo: ["agenda", "meet"].includes(l.origem) ? "reuniao" : l.chave ? "ticket" : "sem",
+    titulo: l.acao || l.chave || "Sem issue", descricao: "", chave: l.chave,
+  })));
+}
+
+function desenharCalendario() {
+  if (!estado) return;
+  const hoje = estado.hoje;
+  const planilha = modoCal === "planilha";
+  const blocos = planilha ? blocosDaPlanilha() : blocosObservados();
+  const pausas = atividadeCal?.pausas || [];
+  const total = blocos.reduce((s, b) => s + b.minutos, 0);
+  const jornada = estado.preferencias.jornada_minutos;
+  $("tituloCal").textContent = planilha ? "Planilha no Tempo" : "Histórico do dia";
+  $("totalCal").textContent = `${hhmm(total)} de ${hhmm(jornada)}`;
+  $("verObservado").classList.toggle("ativo", !planilha);
+  $("verPlanilha").classList.toggle("ativo", planilha);
+
+  const cal = $("calendario");
+  if (!blocos.length) {
+    cal.style.height = "auto";
+    cal.innerHTML = `<p class="vazio" style="padding:12px 0">${planilha ? "Gere o rascunho para ver a planilha aqui." : "Nada observado ainda hoje."}</p>`;
+    return;
+  }
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const mostrarAgora = diaSel === hoje;
+  const inicios = [...blocos.map(b => paraMin(b.inicio)), ...pausas.map(p => paraMin(p.inicio))];
+  const fins = [...blocos.map(b => paraMin(b.fim)), ...pausas.map(p => paraMin(p.fim)), ...(mostrarAgora && !planilha ? [agoraMin] : [])];
+  const ini = Math.floor(Math.min(...inicios) / 60) * 60;
+  const fim = Math.max(Math.ceil(Math.max(...fins) / 60) * 60, ini + 120);
+  const y = m => (m - ini) * PX_MIN;
+
+  let html = "";
+  for (let h = ini; h <= fim; h += 60) {
+    html += `<div class="grade-hora" style="top:${y(h)}px"></div><span class="hora" style="top:${y(h)}px">${String(h / 60).padStart(2, "0")}:00</span>`;
+    if (h < fim) html += `<div class="meia" style="top:${y(h + 30)}px"></div>`;
+  }
+  const MOTIVOS = { bloqueado: "tela bloqueada", suspenso: "suspenso", ausente: "ausente" };
+  for (const p of pausas) {
+    const alt = (paraMin(p.fim) - paraMin(p.inicio)) * PX_MIN;
+    if (alt >= 6) html += `<div class="pausa-cal" style="top:${y(paraMin(p.inicio))}px;height:${alt}px">${alt >= 16 ? `Pausa ${p.inicio}–${p.fim} · ${MOTIVOS[p.motivo] || p.motivo}` : ""}</div>`;
+  }
+  blocosCal = planilha ? [] : blocos;
+  selecao = new Set([...selecao].filter(de => blocosCal.some(b => b.de === de)));
+  cal.classList.toggle("editavel", !planilha);
+  $("dicaSel").hidden = planilha;
+  for (const [i, b] of blocos.entries()) {
+    const topo = y(paraMin(b.inicio)) + 3, alt = Math.max((paraMin(b.fim) - paraMin(b.inicio)) * PX_MIN - 6, 22);
+    const duracao = b.minutos >= 60 ? hhmm(b.minutos) : `${b.minutos}min`;
+    const sel = !planilha && selecao.has(b.de) ? " selecionado" : "";
+    html += `<div class="bloco ${b.tipo}${alt < 60 ? " compacto" : ""}${sel}" data-i="${i}" style="top:${topo}px;height:${alt}px"
+               title="${esc(`${b.inicio}–${b.fim} · ${b.titulo}${b.descricao ? " · " + b.descricao : ""}`)}">
+      <span class="titulo">${esc(b.titulo)}</span>
+      ${b.descricao ? `<span class="desc">${esc(b.descricao)}</span>` : ""}
+      <span class="pe"><span class="chave">${esc(b.chave || (b.tipo === "reuniao" ? "reunião" : ""))}</span><b>${duracao}</b></span></div>`;
+  }
+  if (mostrarAgora && agoraMin >= ini && agoraMin <= fim) {
+    html += `<div class="agora" style="top:${y(agoraMin)}px"><span>${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}</span></div>`;
+  }
+  cal.style.height = `${y(fim)}px`;
+  cal.innerHTML = html;
+}
+
+$("verObservado").addEventListener("click", () => { modoCal = "observado"; desenharCalendario(); });
+
+// Correção pelo calendário: clicar seleciona um bloco; Ctrl + clique seleciona vários.
+
+let blocosCal = [], selecao = new Set();
+
+function selecionados() { return blocosCal.filter(b => selecao.has(b.de)); }
+
+function mostrarPainel() {
+  const sel = selecionados();
+  $("painelSel").hidden = !sel.length;
+  if (!sel.length) return;
+  const de = sel[0], ate = sel[sel.length - 1];
+  const reuniaoNoMeio = sel.length > 1 && blocosCal.some(b => b.tipo === "reuniao" && b.de > de.de && b.de < ate.de);
+  const total = paraMin(ate.fim) - paraMin(de.inicio);
+  $("selTitulo").textContent = sel.length > 1 ? `Juntar ${sel.length} blocos` : de.tipo === "reuniao" ? "Ajustar esta reunião" : "Ajustar este bloco";
+  $("selHorario").hidden = sel.length > 1;
+  if (sel.length === 1 && $("selDe").dataset.bloco !== de.de) {
+    $("selDe").value = de.de.slice(11, 16); $("selAte").value = de.ate.slice(11, 16); $("selDe").dataset.bloco = de.de;
+  }
+  $("selResumo").textContent = `${de.inicio} – ${ate.fim} · ${hhmm(total)}${sel.length > 1 ? " · o tempo entre eles também conta" : ""}`;
+  $("selBlocos").innerHTML = sel.map(b => `<span class="${b.tipo}" title="${esc(b.titulo)}">${esc(b.chave || b.titulo)}</span>`).join("");
+  $("selAplicar").textContent = sel.length > 1 ? "Juntar" : "Aplicar";
+  const i = blocosCal.indexOf(de);
+  $("selAnterior").hidden = sel.length > 1 || i <= 0;
+  $("selProximo").hidden = sel.length > 1 || i >= blocosCal.length - 1;
+  $("selReunioesRot").hidden = !reuniaoNoMeio;
+  if (!$("selChave").value) $("selChave").value = sel.find(b => b.chave)?.chave || "";
+  // sugestões pelo texto do bloco (resumo e documentos), como na planilha
+  const texto = sel.map(b => `${b.titulo} ${b.descricao}`).join(" ");
+  api("GET", `/sugerir?texto=${encodeURIComponent(texto)}`).then(s => {
+    $("selSugestoes").innerHTML = s.length ? `<span class="rot">Sugestões:</span>` + s.map(x =>
+      `<button type="button" data-chave="${esc(x.chave)}" title="Parecido com: ${esc(x.exemplo)}">${esc(x.chave)}<small>${Math.round(x.confianca * 100)}%</small></button>`).join("") : "";
+  }).catch(() => {});
+}
+
+function limparSelecao() {
+  selecao.clear(); $("selChave").value = ""; $("selReunioes").checked = false; delete $("selDe").dataset.bloco;
+  $("painelSel").hidden = true; desenharCalendario();
+}
+
+$("calendario").addEventListener("click", e => {
+  const el = e.target.closest(".bloco[data-i]");
+  if (!el || modoCal !== "observado") return;
+  const b = blocosCal[+el.dataset.i];
+  if (e.ctrlKey || e.metaKey) {
+    selecao.has(b.de) ? selecao.delete(b.de) : selecao.add(b.de);
+  } else {
+    const so = selecao.size === 1 && selecao.has(b.de);
+    selecao = new Set(so ? [] : [b.de]);
+    $("selChave").value = "";
+  }
+  desenharCalendario(); mostrarPainel();
+});
+
+async function aplicarSelecao(blocos, chave) {
+  const ordenados = [...blocos].sort((a, b) => a.de.localeCompare(b.de));
+  const r = await api("POST", `/dias/${diaSel}/reatribuir`, {
+    de: ordenados[0].de, ate: ordenados[ordenados.length - 1].ate, chave,
+    preencher: ordenados.length > 1, incluir_reunioes: $("selReunioes").checked,
+  });
+  avisar(`${r.inicio}–${r.fim} (${hhmm(r.minutos)}) foi para ${r.chave || "sem issue"}.`);
+  limparSelecao(); await atualizar();
+}
+
+$("painelSel").addEventListener("submit", e => {
+  e.preventDefault();
+  const sel = selecionados();
+  const b = sel[0];
+  const mudouHorario = sel.length === 1 && ($("selDe").value !== b.de.slice(11, 16) || $("selAte").value !== b.ate.slice(11, 16));
+  if (!mudouHorario) return tentar(() => aplicarSelecao(sel, $("selChave").value));
+  tentar(async () => {
+    const r = await api("POST", `/dias/${diaSel}/ajustar`, {
+      de: b.de, ate: b.ate, novo_de: $("selDe").value, novo_ate: $("selAte").value, tipo: b.tipo,
+      nome: b.tipo === "reuniao" ? b.titulo : null, chave: $("selChave").value || b.chave, incluir_reunioes: $("selReunioes").checked,
+    });
+    avisar(`Bloco ajustado: ${r.inicio}–${r.fim} (${hhmm(r.minutos)}).`);
+    limparSelecao(); await atualizar(); await irParaDia(diaSel);
+  });
+});
+$("selAnterior").addEventListener("click", () => tentar(() => {
+  const b = selecionados()[0], antes = blocosCal[blocosCal.indexOf(b) - 1];
+  return aplicarSelecao([antes, b], $("selChave").value || b.chave || antes.chave);
+}));
+$("selProximo").addEventListener("click", () => tentar(() => {
+  const b = selecionados()[0], depois = blocosCal[blocosCal.indexOf(b) + 1];
+  return aplicarSelecao([b, depois], $("selChave").value || b.chave || depois.chave);
+}));
+$("selCancelar").addEventListener("click", limparSelecao);
+$("selExcluir").addEventListener("click", () => tentar(async () => {
+  const sel = selecionados();
+  const de = sel[0], ate = sel[sel.length - 1];
+  const minutos = paraMin(ate.fim) - paraMin(de.inicio);
+  if (!await confirmar({
+    titulo: sel.length > 1 ? `Excluir ${sel.length} blocos?` : "Excluir este trecho?",
+    texto: "Esse tempo sai do histórico do dia e não conta em nenhuma issue. Não dá para desfazer.",
+    detalhe: `${de.inicio} – ${ate.fim} · ${hhmm(minutos)} · ${[...new Set(sel.map(b => b.chave || b.titulo))].join(", ")}`,
+    botao: "Excluir",
+  })) return;
+  const r = await api("POST", `/dias/${diaSel}/excluir`, { de: de.de, ate: ate.ate, incluir_reunioes: $("selReunioes").checked || sel.every(b => b.tipo === "reuniao") });
+  avisar(`${r.inicio}–${r.fim} (${hhmm(r.minutos)}) saiu do histórico.`);
+  limparSelecao(); await atualizar(); await irParaDia(diaSel);
+}));
+$("selFechar").addEventListener("click", limparSelecao);
+$("selSugestoes").addEventListener("click", e => {
+  const s = e.target.closest("button[data-chave]");
+  if (s) $("selChave").value = s.dataset.chave;
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && selecao.size) limparSelecao(); });
+$("verPlanilha").addEventListener("click", () => { modoCal = "planilha"; desenharCalendario(); });
+
+// Tickets vistos: mover tudo de um item de hoje para outro ticket
+
+$("vistos").addEventListener("click", e => {
+  const botao = e.target.closest("button.mover");
+  if (botao) {
+    $("vistos").querySelectorAll(".form-mover").forEach(f => f.remove());
+    const li = botao.closest("li");
+    li.insertAdjacentHTML("beforeend", `<form class="form-mover" data-tipo="${esc(botao.dataset.tipo)}" data-nome="${esc(botao.dataset.nome)}">
+      <input list="sugestoes" placeholder="Para qual issue?" autocomplete="off" aria-label="Issue de destino">
+      <button class="primario pequeno">Mover</button><button type="button" class="pequeno cancelar">Cancelar</button></form>`);
+    li.querySelector(".form-mover input").focus();
+    return;
+  }
+  if (e.target.closest(".form-mover .cancelar")) { e.target.closest("form").remove(); atualizar().catch(() => {}); }
+});
+$("vistos").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target.closest(".form-mover");
+  tentar(async () => {
+    const r = await api("POST", `/dias/${estado.hoje}/mover`, { tipo: f.dataset.tipo, nome: f.dataset.nome, para: f.querySelector("input").value });
+    f.remove();
+    avisar(`${hhmm(r.minutos)} de "${r.de}" foram para ${r.para}.`);
+    await atualizar();
+  });
+});
+
+// Agora: o que o observador está atribuindo e por quê (a cada 3 s com a página aberta)
+
+async function atualizarAgora() {
+  const a = await api("GET", "/agora");
+  const ponto = $("agoraPonto");
+  ponto.className = "ponto";
+  let titulo, motivo = a.motivo || "", detalhe = a.detalhe || "";
+  if (!a.ativo) { titulo = "Observador desligado"; motivo = ""; detalhe = ""; }
+  else if (a.bloqueado) { titulo = "Tela bloqueada"; motivo = "pausa"; detalhe = ""; ponto.classList.add("ausente"); }
+  else if (a.ausente) { titulo = "Ausente"; motivo = "sem teclado e mouse"; detalhe = ""; ponto.classList.add("ausente"); }
+  else if (a.reuniao) { titulo = a.chave || "Reunião"; ponto.classList.add("reuniao"); }
+  else { titulo = a.chave || "Sem issue"; ponto.classList.add(a.chave ? "ativo" : "ausente"); }
+  if (a.pelo_mouse && a.ativo && !a.ausente && !a.bloqueado) detalhe = `${detalhe ? detalhe + " · " : ""}janela sob o mouse (outra tela)`;
+  if (a.sem_ticket_desde && !a.chave) motivo += ` · desde ${a.sem_ticket_desde.slice(11, 16)}`;
+  const reservado = !!a.reserva;
+  if (reservado) { titulo = a.reserva.chave || "Horário reservado"; motivo = `reservado desde ${a.reserva.inicio.slice(11, 16)}`; detalhe = a.reserva.descricao; ponto.className = "ponto reuniao"; }
+  $("encerrarReserva").hidden = !reservado;
+  $("naoEIsso").hidden = reservado;
+  $("agoraChave").textContent = titulo;
+  $("agoraChave").className = a.chave ? "chave" : "";
+  $("agoraMotivo").textContent = motivo;
+  $("agoraDetalhe").textContent = detalhe;
+}
+
+$("naoEIsso").addEventListener("click", () => {
+  $("formCorrigir").hidden = false;
+  $("campoCorrigir").focus();
+});
+$("cancelarCorrigir").addEventListener("click", () => { $("formCorrigir").hidden = true; });
+$("formCorrigir").addEventListener("submit", async e => {
+  e.preventDefault();
+  await tentar(async () => {
+    const r = await api("POST", "/corrigir", { chave: $("campoCorrigir").value });
+    $("formCorrigir").hidden = true; $("campoCorrigir").value = "";
+    avisar(r.minutos ? `${r.minutos} min desde ${r.desde} foram para ${r.chave}. Fixado até você limpar o foco.`
+                     : `${r.chave} fixado até você limpar o foco.`);
+    await atualizar(); await atualizarAgora();
+  });
+});
+
+// Dia do histórico: escolher outro dia substitui o histórico pelo daquele dia
+
+let diaSel = null, atividadeCal = null;
+
+async function irParaDia(d) {
+  diaSel = d;
+  $("diaHistorico").value = d;
+  $("diaRascunho").value = d;
+  const hoje = estado?.hoje;
+  $("tituloCal").textContent = d === hoje ? "Histórico do dia" : `Histórico de ${dataBonita(d)}`;
+  $("diaHoje").hidden = d === hoje;
+  $("diaProximo").disabled = d >= hoje;
+  selecao.clear(); $("painelSel").hidden = true;
+  atividadeCal = d === hoje ? estado.atividade : await api("GET", `/dias/${d}/atividade`).catch(() => null);
+  await carregarRascunho();  // também redesenha o calendário
+}
+
+function somarDias(d, n) {
+  const x = new Date(d + "T12:00"); x.setDate(x.getDate() + n);
+  return x.toISOString().slice(0, 10);
+}
+$("diaAnterior").addEventListener("click", () => tentar(() => irParaDia(somarDias(diaSel, -1))));
+$("diaProximo").addEventListener("click", () => tentar(() => irParaDia(somarDias(diaSel, 1))));
+$("diaHoje").addEventListener("click", () => tentar(() => irParaDia(estado.hoje)));
+$("diaHistorico").addEventListener("change", e => { if (e.target.value) tentar(() => irParaDia(e.target.value)); });
+
+// Validar dia (a planilha mora aqui) e Exportar
+
+async function garantirRascunho() {
+  await carregarRascunho();
+  if (!rascunho) mostrarRascunho(await api("POST", `/dias/${diaSel}/rascunho`));
+}
+$("abrirValidar").addEventListener("click", () => tentar(async () => {
+  $("tituloValidar").textContent = diaSel === estado.hoje ? "Validar o dia de hoje" : `Validar ${dataBonita(diaSel)}`;
+  await garantirRascunho();
+  $("validar").showModal();
+}));
+$("fecharValidar").addEventListener("click", () => $("validar").close());
+$("validar").addEventListener("close", () => { salvarAgora(); atualizar().catch(() => {}); });
+$("exportar").addEventListener("click", () => tentar(async () => {
+  await garantirRascunho();
+  await salvarAgora();
+  location.href = `/dias/${diaSel}/rascunho?formato=csv`;
+}));
+
+// Reservar horário (trabalho fora do computador)
+
+function horaAgora(deslocamento = 0) {
+  const d = new Date(Date.now() + deslocamento * 60000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+$("abrirReserva").addEventListener("click", () => {
+  $("resDe").value = horaAgora(-60); $("resAte").value = horaAgora();
+  $("reserva").showModal(); $("resDescricao").focus();
+});
+$("fecharReserva").addEventListener("click", () => $("reserva").close());
+$("cancelarReserva").addEventListener("click", () => $("reserva").close());
+$("resAtalhos").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) { $("resDescricao").value = b.textContent; $("resChave").focus(); }
+});
+["resDe", "resAte"].forEach(id => $(id).addEventListener("input", () => { document.querySelector('input[name=quando][value=intervalo]').checked = true; }));
+$("formReserva").addEventListener("submit", e => {
+  e.preventDefault();
+  tentar(async () => {
+    const corpo = { chave: $("resChave").value, descricao: $("resDescricao").value };
+    if (document.querySelector("input[name=quando]:checked").value === "agora") {
+      await api("POST", "/reserva", corpo);
+      avisar(`Reservado: ${corpo.descricao}. Quando voltar, clique em Encerrar reserva.`);
+    } else {
+      const r = await api("POST", `/dias/${estado.hoje}/reservar`, { ...corpo, de: $("resDe").value, ate: $("resAte").value });
+      avisar(`${r.inicio}–${r.fim} reservado: ${r.descricao}.`);
+    }
+    $("reserva").close(); $("resDescricao").value = ""; $("resChave").value = "";
+    await atualizar(); await atualizarAgora(); if (diaSel === estado.hoje) await irParaDia(diaSel);
+  });
+});
+$("encerrarReserva").addEventListener("click", () => tentar(async () => {
+  const r = await api("DELETE", "/reserva");
+  avisar(`Reserva encerrada: ${hhmm(r.minutos)} de ${r.descricao}.`);
+  await atualizar(); await atualizarAgora();
+}));
+
+// Tema claro/escuro e privacidade
+
+(() => {
+  // Só claro e escuro. Na primeira vez segue o Windows; depois vale a sua escolha.
+  const LUA = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>', SOL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  let tema = lido("trampotime.tema") || (matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro");
+  const aplicar = () => {
+    document.documentElement.dataset.tema = tema;
+    const botao = $("alternarTema"), proximo = tema === "escuro" ? "claro" : "escuro";
+    botao.innerHTML = tema === "escuro" ? SOL : LUA;
+    botao.title = `Mudar para o tema ${proximo}`; botao.setAttribute("aria-label", botao.title);
+  };
+  aplicar();
+  $("alternarTema").addEventListener("click", () => {
+    tema = tema === "escuro" ? "claro" : "escuro";
+    lembrar("trampotime.tema", tema); aplicar(); desenharCalendario();
+  });
+})();
+
+$("abrirPrivacidade").addEventListener("click", () => {
+  const p = estado?.preferencias;
+  $("privProgramas").innerHTML = p?.guardar_titulos?.length ? p.guardar_titulos.map(x => `<span>${esc(x)}</span>`).join("") : "nenhum";
+  $("privDias").textContent = `${p?.manter_dias || 5} dias`;
+  $("privacidade").showModal();
+});
+$("fecharPrivacidade").addEventListener("click", () => $("privacidade").close());
+
+// Perguntas do TrampoTime: juntar trechos, associar atividades e rotinas
+
+async function atualizarPerguntas() {
+  const ps = await api("GET", "/perguntas");
+  $("cardPerguntas").hidden = !ps.length;
+  $("contagemPerguntas").textContent = ps.length || "";
+  $("perguntas").innerHTML = ps.map(p => `<li class="${esc(p.tipo)}" data-id="${esc(p.id)}">
+      <span class="texto">${esc(p.pergunta)}${p.detalhe ? `<span class="det">${esc(p.detalhe)}</span>` : ""}</span>
+      <span class="botoes"><button type="button" class="primario pequeno" data-sim="1">Sim</button>
+        <button type="button" class="pequeno" data-sim="0">Não</button></span></li>`).join("");
+}
+
+$("perguntas").addEventListener("click", e => {
+  const botao = e.target.closest("button[data-sim]");
+  if (!botao) return;
+  const id = botao.closest("li").dataset.id;
+  tentar(async () => {
+    const r = await api("POST", "/perguntas/responder", { id, sim: botao.dataset.sim === "1" });
+    avisar(r.feito);
+    await atualizar();
+  });
+});
+
+// Foco
+
+$("limparFoco").addEventListener("click", () => tentar(async () => { await api("POST", "/foco", { chave: null }); await atualizar(); }));
+
+// Rascunho
+
+function dia() { return $("diaRascunho").value; }
+
+async function carregarRascunho() {
+  $("baixarCsv").href = `/dias/${dia()}/rascunho?formato=csv`;
+  try { mostrarRascunho(await api("GET", `/dias/${dia()}/rascunho`)); }
+  catch { mostrarRascunho(null); }
+}
+
+function mostrarRascunho(dados) {
+  rascunho = dados; editado = false;
+  const fechado = dados && ["lancado", "publicado"].includes(dados.status);
+  $("statusDia").innerHTML = dados ? selo(dados.status) : selo("pendente");
+  $("linhas").innerHTML = dados && dados.linhas.length ? dados.linhas.map(l => linhaHtml(l, fechado)).join("")
+    : `<tr><td colspan="6" class="vazio">${dados ? "Nenhuma linha." : "Ainda não há rascunho para este dia. Clique em Gerar rascunho."}</td></tr>`;
+  $("problemas").innerHTML = (dados ? [...(dados.avisos || []), ...dados.problemas] : []).map(p => `<p>${esc(p)}</p>`).join("");
+  for (const b of ["addLinha", "aprovar"]) $(b).disabled = !dados || fechado;
+  $("salvoEm").textContent = "";
+  $("lancado").disabled = !dados || dados.status !== "aprovado";
+  $("gerar").disabled = fechado;
+  $("gerar").textContent = dados ? "Atualizar do histórico" : "Gerar rascunho";
+  $("limpar").disabled = !dados || fechado;
+  $("desatualizado").hidden = !(dados && dados.desatualizado);
+  somar();
+  desenharCalendario();
+  $("linhas").querySelectorAll("tr[data-origem]").forEach(sugerirLinha);
+}
+
+function linhaHtml(l, fechado) {
+  const ro = fechado ? "disabled" : "";
+  return `<tr data-origem="${esc(l.origem)}" data-inicio="${esc(l.inicio || "")}">
+    <td><input class="chave" value="${esc(l.chave || "")}" placeholder="sem issue" list="sugestoes" ${ro}><div class="sugestoes"></div></td>
+    <td><input value="${esc(l.acao)}" ${ro}></td>
+    <td class="tempo"><input value="${hhmm(l.minutos)}" ${ro}></td>
+    <td class="horario" title="${l.inicio ? "Horário real da reunião" : "Preenche o dia em volta das reuniões e pausas"}">${trechosHtml(l.periodos)}</td>
+    <td class="origem">${esc(l.origem)}</td>
+    <td class="acoes"><button type="button" class="pequeno copiar" title="Copiar issue, tempo e descrição">Copiar</button>${fechado ? "" : `<button type="button" class="pequeno excluir" title="Excluir esta linha" aria-label="Excluir esta linha">×</button>`}</td></tr>`;
+}
+
+function linhasDaTela() {
+  return [...$("linhas").querySelectorAll("tr[data-origem]")].map(tr => {
+    const [chave, acao, tempo] = tr.querySelectorAll("input");
+    return { chave: chave.value, acao: acao.value, minutos: tempo.value, origem: tr.dataset.origem, inicio: tr.dataset.inicio || null };
+  });
+}
+
+function somar() {
+  const total = linhasDaTela().reduce((s, l) => s + paraMinutos(l.minutos), 0) + (rascunho?.ja_lancado_minutos || 0);
+  const jornada = estado?.preferencias.jornada_minutos || 450;
+  $("total").textContent = rascunho ? `Total ${hhmm(total)} de ${hhmm(jornada)}` + (total === jornada ? " ✓" : "") : "";
+  $("total").style.color = rascunho && total !== jornada ? "var(--alerta)" : "";
+}
+
+function trechosHtml(ps) { return (ps || []).map(([i, f]) => `<span>${i} – ${f}</span>`).join(""); }
+
+let timerHorarios = null;
+function recalcularHorarios() {
+  clearTimeout(timerHorarios);
+  timerHorarios = setTimeout(async () => {
+    try {
+      const ps = await api("POST", `/dias/${dia()}/horarios`, linhasDaTela());
+      $("linhas").querySelectorAll("tr[data-origem]").forEach((tr, i) => { tr.querySelector("td.horario").innerHTML = trechosHtml(ps[i]); });
+      desenharCalendario();
+    } catch { /* minutos incompletos enquanto digita */ }
+  }, 400);
+}
+
+// Salva sozinho: 1 s depois da última tecla.
+let timerSalvar = null, versao = 0;
+function salvarDepois() {
+  editado = true; versao++;
+  clearTimeout(timerSalvar);
+  $("salvoEm").textContent = "Salvando…";
+  timerSalvar = setTimeout(salvarAgora, 1000);
+}
+async function salvarAgora() {
+  clearTimeout(timerSalvar);
+  if (!rascunho || !editado) return;
+  const minhaVersao = versao;
+  try {
+    const dados = await api("PUT", `/dias/${dia()}/linhas`, linhasDaTela());
+    rascunho = dados;
+    if (versao === minhaVersao) editado = false;
+    $("statusDia").innerHTML = selo(dados.status);
+    $("problemas").innerHTML = dados.problemas.map(p => `<p>${esc(p)}</p>`).join("");
+    $("lancado").disabled = dados.status !== "aprovado";
+    const h = new Date();
+    $("salvoEm").textContent = `Salvo às ${String(h.getHours()).padStart(2, "0")}:${String(h.getMinutes()).padStart(2, "0")}`;
+  } catch (e) {
+    $("salvoEm").textContent = `Não salvo: ${e.message}`;
+  }
+}
+
+// Sugestão de ticket pela descrição (KNN no servidor), para linhas sem ticket.
+const timersSugestao = new WeakMap();
+function sugerirLinha(tr) {
+  const [chave, acao] = tr.querySelectorAll("input");
+  const caixa = tr.querySelector(".sugestoes");
+  if (!caixa) return;
+  clearTimeout(timersSugestao.get(tr));
+  if (chave.value.trim() || !acao.value.trim() || chave.disabled) { caixa.innerHTML = ""; return; }
+  timersSugestao.set(tr, setTimeout(async () => {
+    try {
+      const s = await api("GET", `/sugerir?texto=${encodeURIComponent(acao.value)}`);
+      if (chave.value.trim()) return;
+      caixa.innerHTML = s.map(x => `<button type="button" data-chave="${esc(x.chave)}"
+        title="Parecido com: ${esc(x.exemplo)}">${esc(x.chave)} · ${Math.round(x.confianca * 100)}%</button>`).join("");
+    } catch { /* sem sugestão */ }
+  }, 350));
+}
+
+$("linhas").addEventListener("change", e => {
+  if (!e.target.classList.contains("chave")) return;
+  const m = e.target.value.match(/^\s*([A-Za-z][A-Za-z0-9]+-\d+)\s*[-–:|]\s*(.+?)\s*$/);
+  if (!m) return;
+  const tr = e.target.closest("tr"), acao = tr.querySelectorAll("input")[1];
+  e.target.value = m[1].toUpperCase();
+  if (!acao.value.trim()) acao.value = m[2];
+  api("POST", "/issues", { chave: m[1], nome: m[2] }).catch(() => {});
+  salvarDepois();
+});
+$("linhas").addEventListener("input", e => {
+  somar(); recalcularHorarios(); salvarDepois();
+  const tr = e.target.closest("tr[data-origem]");
+  if (tr) sugerirLinha(tr);
+});
+$("linhas").addEventListener("click", async e => {
+  const sugestao = e.target.closest(".sugestoes button");
+  if (sugestao) {
+    const tr = sugestao.closest("tr");
+    tr.querySelector("input.chave").value = sugestao.dataset.chave;
+    tr.querySelector(".sugestoes").innerHTML = "";
+    salvarDepois();
+    return;
+  }
+  if (e.target.classList.contains("excluir")) {
+    e.target.closest("tr").remove();
+    if (!$("linhas").querySelector("tr[data-origem]")) $("linhas").innerHTML = `<tr><td colspan="6" class="vazio">Nenhuma linha.</td></tr>`;
+    somar(); recalcularHorarios(); salvarDepois();
+    return;
+  }
+  if (!e.target.classList.contains("copiar")) return;
+  const [chave, acao, tempo] = e.target.closest("tr").querySelectorAll("input");
+  const horario = [...e.target.closest("tr").querySelectorAll("td.horario span")].map(s => s.textContent).join(", ");
+  try { await navigator.clipboard.writeText(`${chave.value}\t${tempo.value}\t${horario}\t${acao.value}`); avisar("Copiado."); }
+  catch { avisar("Não consegui copiar.", true); }
+});
+$("addLinha").addEventListener("click", () => {
+  if ($("linhas").querySelector("td[colspan]")) $("linhas").innerHTML = "";
+  $("linhas").insertAdjacentHTML("beforeend", linhaHtml({ chave: "", acao: "", minutos: 0, origem: "manual", periodos: [] }, false));
+  somar(); recalcularHorarios(); salvarDepois();
+});
+$("limpar").addEventListener("click", () => tentar(async () => {
+  if (!await confirmar({
+    titulo: "Limpar a planilha?",
+    texto: "As linhas e as edições da planilha deste dia são apagadas. O histórico do dia continua como está.",
+    detalhe: dataBonita(dia()),
+    botao: "Limpar planilha",
+  })) return;
+  clearTimeout(timerSalvar); editado = false;
+  await api("DELETE", `/dias/${dia()}/rascunho`);
+  mostrarRascunho(null); avisar("Planilha limpa."); await atualizar();
+}));
+$("atualizarPlanilha").addEventListener("click", () => $("gerar").click());
+$("gerar").addEventListener("click", () => tentar(async () => {
+  if (rascunho && !await confirmar({
+    titulo: "Atualizar a planilha do histórico?",
+    texto: "A planilha é montada de novo a partir do histórico e as edições que você fez nela são substituídas.",
+    detalhe: dataBonita(dia()),
+    botao: "Atualizar", perigo: false,
+  })) return;
+  clearTimeout(timerSalvar); editado = false;
+  mostrarRascunho(await api("POST", `/dias/${dia()}/rascunho`)); await atualizar();
+}));
+$("aprovar").addEventListener("click", () => tentar(async () => {
+  clearTimeout(timerSalvar);
+  if (editado) await api("PUT", `/dias/${dia()}/linhas`, linhasDaTela());
+  mostrarRascunho(await api("POST", `/dias/${dia()}/aprovar`)); avisar("Aprovado. Lance no Tempo e depois clique em Marquei no Tempo."); await atualizar();
+}));
+$("lancado").addEventListener("click", () => tentar(async () => {
+  mostrarRascunho(await api("POST", `/dias/${dia()}/lancado`)); avisar("Dia fechado."); await atualizar();
+}));
+$("diaRascunho").addEventListener("change", carregarRascunho);
+
+// Confirmação em janela: devolve true se a pessoa confirmou. perigo=false usa o botão azul (ação que não apaga).
+function confirmar({ titulo, texto, detalhe = "", botao = "Confirmar", perigo = true }) {
+  const d = $("confirmacao");
+  d.classList.toggle("neutro", !perigo);
+  $("confTitulo").textContent = titulo;
+  $("confTexto").textContent = texto;
+  $("confDetalhe").textContent = detalhe;
+  $("confDetalhe").hidden = !detalhe;
+  $("confOk").textContent = botao;
+  return new Promise(resolve => {
+    const fechar = ok => { d.close(); resolve(ok); };
+    $("confOk").onclick = () => fechar(true);
+    $("confCancelar").onclick = () => fechar(false);
+    d.oncancel = e => { e.preventDefault(); fechar(false); };  // Esc
+    d.showModal();
+    $("confCancelar").focus();  // o foco começa no botão seguro
+  });
+}
+
+// Configuração
+
+function abrirConfig() {
+  const p = estado.preferencias;
+  $("cProjetos").value = p.projetos.join(", ");
+  $("cJornada").value = hhmm(p.jornada_minutos);
+  $("cInicio").value = p.inicio_dia;
+  $("cBloco").value = String(p.bloco_minutos);
+  $("cOcioso").value = String(p.ocioso_minutos);
+  $("cReunioes").value = p.ticket_reunioes;
+  $("cIgnorar").value = p.ignorar_eventos.join(", ");
+  $("cManter").value = String(p.manter_dias);
+  $("cGuardar").value = p.guardar_titulos.join(", ");
+  $("cAvisos").checked = p.avisos;
+  const textos = {
+    conectada: "Google Agenda conectada. As reuniões vêm da agenda.",
+    desconectada: "Arquivo credentials.json encontrado. Conecte para ler as reuniões da agenda.",
+    sem_credenciais: "Sem Google Agenda, as reuniões vêm do tempo com a aba do Meet aberta em foco. "
+      + "Para usar a agenda, coloque o credentials.json (OAuth de app desktop) na pasta do TrampoTime.",
+  };
+  $("agendaTexto").textContent = textos[estado.agenda];
+  $("conectarAgenda").hidden = estado.agenda !== "desconectada";
+  $("fecharConfig").hidden = !estado.configurado;
+  $("config").showModal();
+}
+$("abrirConfig").addEventListener("click", abrirConfig);
+$("fecharConfig").addEventListener("click", () => $("config").close());
+$("config").addEventListener("cancel", e => { if (!estado.configurado) e.preventDefault(); });
+$("formConfig").addEventListener("submit", e => {
+  e.preventDefault();
+  tentar(async () => {
+    await api("PUT", "/preferencias", {
+      projetos: $("cProjetos").value, jornada_minutos: paraMinutos($("cJornada").value), inicio_dia: $("cInicio").value,
+      bloco_minutos: +$("cBloco").value, ocioso_minutos: +$("cOcioso").value,
+      ticket_reunioes: $("cReunioes").value, ignorar_eventos: $("cIgnorar").value, manter_dias: +$("cManter").value,
+      guardar_titulos: $("cGuardar").value, avisos: $("cAvisos").checked,
+    });
+    $("config").close(); avisar("Configuração salva."); await atualizar(); somar();
+  });
+});
+$("conectarAgenda").addEventListener("click", () => tentar(async () => {
+  avisar("Autorize no navegador que vai abrir.");
+  await api("POST", "/agenda/conectar"); await atualizar(); abrirConfig();
+}));
+
+// Esconder seções e o painel lateral (lembrado neste navegador)
+
+function lido(chave) { try { return localStorage.getItem(chave); } catch { return null; } }
+function lembrar(chave, valor) { try { localStorage.setItem(chave, valor); } catch { /* sem armazenamento */ } }
+
+const secoes = [...document.querySelectorAll(".secao")];
+
+function recolher(secao, recolhido) {
+  secao.classList.toggle("recolhido", recolhido);
+  const botao = secao.querySelector(".esconder");
+  botao.textContent = recolhido ? "Mostrar" : "Esconder";
+  botao.setAttribute("aria-expanded", String(!recolhido));
+  lembrar(`trampotime.esconder.${secao.dataset.secao}`, recolhido ? "1" : "0");
+  if (!recolhido && secao.dataset.secao === "historico") desenharCalendario();
+}
+
+for (const secao of secoes) {
+  let botao = secao.querySelector(".esconder");
+  if (!botao) {
+    botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "pequeno esconder";
+    secao.querySelector(".cab").appendChild(botao);
+  }
+  botao.addEventListener("click", () => recolher(secao, !secao.classList.contains("recolhido")));
+  recolher(secao, lido(`trampotime.esconder.${secao.dataset.secao}`) === "1");
+}
+
+
+
+// O painel lateral não se esconde mais pelo cabeçalho; cada card tem o seu Esconder.
+
+// Início
+
+(async () => {
+  await tentar(atualizar);
+  await irParaDia(estado?.hoje || new Date().toISOString().slice(0, 10));
+  if (estado && !estado.configurado) abrirConfig();
+  await atualizarAgora().catch(() => {});
+  setInterval(() => { if (document.visibilityState === "visible") atualizarAgora().catch(() => {}); }, 3000);
+  setInterval(() => atualizar().catch(() => {}), 15000);
+})();
+</script>
+</body>
+</html>

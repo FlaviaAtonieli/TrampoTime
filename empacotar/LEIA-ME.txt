@@ -1,0 +1,29 @@
+TrampoTime (piloto)
+===================
+
+O TrampoTime observa as janelas em que você trabalha no Windows e monta a planilha
+de horas do dia para você lançar no Tempo. Tudo fica no seu computador.
+
+COMO USAR
+1. Descompacte esta pasta num lugar fixo, por exemplo Documentos\TrampoTime.
+   Não rode de dentro do .zip: os seus dados ficam nesta pasta.
+2. Dê dois cliques em TrampoTime.exe. O navegador abre em http://127.0.0.1:8765.
+   Deixe a janela preta aberta enquanto trabalha; fechá-la desliga o TrampoTime.
+3. Na primeira vez, a página pede a configuração (projetos, jornada, início do dia).
+
+AVISO DO WINDOWS
+O .exe ainda não é assinado. Se aparecer "O Windows protegeu o computador",
+clique em "Mais informações" e depois em "Executar assim mesmo".
+
+LIGAR SOZINHO COM O WINDOWS (opcional)
+Abra um terminal nesta pasta e rode:
+    TrampoTime.exe instalar-inicio
+Para desfazer:  TrampoTime.exe remover-inicio
+Para desligar o que está em segundo plano:  TrampoTime.exe parar
+
+O QUE FICA NESTA PASTA
+- trampotime.db: o seu histórico (não compartilhe).
+- .env: configurações avançadas; o padrão já funciona sem mexer.
+- trampotime.log e trampotime-erros.log: se algo der errado, mande o de erros.
+
+Dúvidas ou problemas: fale com a Flávia.

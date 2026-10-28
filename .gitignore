@@ -1,0 +1,14 @@
+.env
+credentials.json
+token.json
+*.db
+*.csv
+__pycache__/
+.venv/
+dist/
+build/
+*.spec
+.pytest_cache/
+*.log
+*.db-wal
+*.db-shm
