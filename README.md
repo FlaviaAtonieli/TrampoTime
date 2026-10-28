@@ -1,2 +1,2 @@
 # TrampoTime
-pontamento inteligente de horas
+Apontamento inteligente de horas
