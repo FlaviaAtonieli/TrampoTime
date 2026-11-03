@@ -67,3 +67,23 @@ def test_dia_ate_marcar_como_lancado(cliente):
     assert cliente.post(f"/dias/{HOJE}/rascunho", headers=X).status_code == 409  # dia fechado
     assert cliente.get("/estado").json()["dias"][0]["status"] in {"lancado", "pendente"}  # hoje pode ser fim de semana
     assert "DMANESTOQ-15684;" in cliente.get(f"/dias/{HOJE}/rascunho?formato=csv").text
+
+
+def test_titulo_e_descricao_do_bloco(cliente):
+    banco = api._servico.banco
+    for i in range(30):
+        observador.anotar(banco, "chrome.exe", "[DMANESTOQ-15684] Ajuste - Jira", 0, 60, 300, (),
+                          datetime.now().replace(hour=10, minute=i, second=0))
+    bloco = cliente.get(f"/dias/{HOJE}/atividade").json()["historico"][0]
+    r = cliente.post(f"/dias/{HOJE}/rotulo", json={"de": bloco["de"], "ate": bloco["ate"],
+                                                   "titulo": "Ajuste do saldo", "descricao": "Corrigi o cálculo do saldo"}, headers=X)
+    assert r.status_code == 200
+    bloco = cliente.get(f"/dias/{HOJE}/atividade").json()["historico"][0]
+    assert bloco["titulo_editado"] == "Ajuste do saldo" and bloco["descricao_editada"] == "Corrigi o cálculo do saldo"
+    linhas = cliente.post(f"/dias/{HOJE}/rascunho", headers=X).json()["linhas"]
+    assert any(l["chave"] == "DMANESTOQ-15684" and l["acao"] == "Corrigi o cálculo do saldo" for l in linhas)
+
+    cliente.post(f"/dias/{HOJE}/rotulo", json={"de": bloco["de"], "ate": bloco["ate"], "titulo": "", "descricao": ""}, headers=X)
+    assert "titulo_editado" not in cliente.get(f"/dias/{HOJE}/atividade").json()["historico"][0]
+    assert cliente.post(f"/dias/{HOJE}/rotulo", json={"de": "2001-01-01T10:00:00", "ate": "2001-01-01T11:00:00",
+                                                      "titulo": "x"}, headers=X).status_code == 409

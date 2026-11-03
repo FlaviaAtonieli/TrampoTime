@@ -50,8 +50,9 @@ class Servico:
             tickets = observador.tickets_observados(amostras)
             ja_lancado = 0
         nomes = self.banco.nomes_de_issues()
+        editadas = _descricoes_por_ticket(rotular(observador.periodos(amostras).get("historico", []), self.banco.rotulos(dia)))
         for t in tickets:
-            t.resumo = nomes.get(t.chave, t.resumo)
+            t.resumo = editadas.get(t.chave) or nomes.get(t.chave, t.resumo)
         linhas = motor.montar_rascunho(reunioes, tickets, ja_lancado, c.jornada_minutos, c.bloco_minutos, c.ticket_reunioes)
         self.banco.salvar(dia, "rascunho", ja_lancado, linhas)
         self.banco.definir_meta(f"rascunho_base:{dia.isoformat()}", self._base(amostras))
@@ -86,7 +87,7 @@ class Servico:
             "inicio": p["inicio"],
             "fim": p["fim"],
             "pausas": pausas,
-            "historico": p.get("historico", []),
+            "historico": rotular(p.get("historico", []), self.banco.rotulos(dia)),
             "pausa_minutos": sum(x["minutos"] for x in pausas),
             # Na página aparece tudo o que foi visto; o mínimo de minutos vale só para o rascunho.
             "tickets": [{"chave": t.chave, "resumo": nomes.get(t.chave, t.resumo), "minutos": t.peso, "periodos": quando.get(f"ticket:{t.chave}", []),
@@ -131,6 +132,14 @@ class Servico:
             if a["fonte"] not in {"reuniao", "titulo"} and observador.rotulo_do_app(a["app"], a["titulo"]) == p["rotulo"]:
                 n += self.banco.reatribuir_entre(a["instante"], a["instante"] + "~", p["chave"], "associado")
         return {"feito": f"\"{p['rotulo']}\" agora conta para {p['chave']}, hoje e nos próximos dias."}
+
+    def rotular_intervalo(self, dia: date, de: str, ate: str, titulo: str, descricao: str) -> dict:
+        """Título e descrição próprios para um bloco do histórico (vazios = volta ao que foi observado)."""
+        if not de.startswith(dia.isoformat()) or not ate or ate <= de:
+            raise ErroDeFluxo("Esse bloco não é deste dia.")
+        titulo, descricao = titulo.strip()[:120], descricao.strip()[:500]
+        self.banco.definir_rotulo(de, ate, titulo, descricao)
+        return {"de": de, "ate": ate, "titulo": titulo, "descricao": descricao}
 
     def reatribuir_intervalo(self, dia: date, inicio: str, fim: str, chave: str | None, preencher: bool = False,
                              incluir_reunioes: bool = False, fonte: str = "manual") -> dict:
@@ -356,6 +365,35 @@ class Servico:
         if not dados:
             raise ErroDeFluxo(f"Não há rascunho para {dia}. Gere um primeiro.")
         return dados
+
+
+def rotular(historico: list[dict], rotulos: list[dict]) -> list[dict]:
+    """Põe nos blocos do histórico o título e a descrição que você deu. Cada rótulo vai para o bloco com que
+    mais se sobrepõe (o bloco pode ter mudado um pouco de tamanho desde a edição)."""
+    blocos = [dict(b) for b in historico]
+    for r in rotulos:
+        def sobreposicao(b):
+            return (min(b["ate"], r["ate"]) > max(b["de"], r["de"]),
+                    (datetime.fromisoformat(min(b["ate"], r["ate"])) - datetime.fromisoformat(max(b["de"], r["de"]))).total_seconds())
+        candidatos = [b for b in blocos if sobreposicao(b)[0]]
+        if not candidatos:
+            continue
+        alvo = max(candidatos, key=lambda b: sobreposicao(b)[1])
+        if r["titulo"]:
+            alvo["titulo_editado"] = r["titulo"]
+        if r["descricao"]:
+            alvo["descricao_editada"] = r["descricao"]
+    return blocos
+
+
+def _descricoes_por_ticket(historico: list[dict]) -> dict[str, str]:
+    """Descrições editadas dos blocos de cada ticket, juntas, para a linha da planilha."""
+    por_ticket: dict[str, list[str]] = {}
+    for b in historico:
+        texto = b.get("descricao_editada") or b.get("titulo_editado")
+        if b["tipo"] == "ticket" and texto and texto not in por_ticket.setdefault(b["nome"], []):
+            por_ticket[b["nome"]].append(texto)
+    return {chave: "; ".join(textos) for chave, textos in por_ticket.items() if textos}
 
 
 def _fora_da_agenda(observadas: list, da_agenda: list) -> list:

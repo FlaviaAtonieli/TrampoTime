@@ -148,6 +148,13 @@ def reatribuir(dia: date, corpo: dict = Body(...)):
                   bool(corpo.get("preencher")), bool(corpo.get("incluir_reunioes")))
 
 
+@app.post("/dias/{dia}/rotulo")
+def rotulo(dia: date, corpo: dict = Body(...)):
+    """Título e descrição próprios para um bloco do histórico."""
+    return _rodar(servico().rotular_intervalo, dia, str(corpo.get("de") or ""), str(corpo.get("ate") or ""),
+                  str(corpo.get("titulo") or ""), str(corpo.get("descricao") or ""))
+
+
 @app.post("/dias/{dia}/reservar")
 def reservar(dia: date, corpo: dict = Body(...)):
     """Reserva um horário (de/ate em HH:MM) como trabalho fora do computador."""
