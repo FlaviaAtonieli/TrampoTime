@@ -33,8 +33,8 @@
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--fundo); color: var(--texto);
          font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
-  main { max-width: 1360px; margin: 0 auto; padding: 24px 16px 64px; }
-  .leiaute { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  main { width: 100%; margin: 0; padding: clamp(16px, 2vw, 32px) clamp(16px, 2.5vw, 48px) 64px; }
+  .leiaute { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 480px); gap: clamp(16px, 1.4vw, 28px); align-items: start; }
   .leiaute.sem-lateral { grid-template-columns: minmax(0, 1fr); }
   .leiaute.sem-lateral .lateral { display: none; }
   .principal, .lateral { display: grid; gap: 16px; min-width: 0; }
@@ -45,6 +45,9 @@
   .lateral [data-secao="vistos"] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .lateral [data-secao="vistos"].recolhido { flex: 0 0 auto; }
   .lateral #vistos { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  @media (max-width: 1100px) {
+    .leiaute { grid-template-columns: minmax(0, 1fr) 300px; }
+  }
   @media (max-width: 900px) {
     .leiaute { grid-template-columns: minmax(0, 1fr); }
     .lateral { position: static; height: auto; }
@@ -221,9 +224,6 @@
   .topo-cal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .topo-cal h2 { margin: 0 8px 0 0; }
   .topo-cal .total-cal { margin-left: auto; font-weight: 600; color: var(--marca); }
-  .alternar { display: inline-flex; border: 1px solid var(--linha); border-radius: 8px; overflow: hidden; }
-  .alternar button { border: 0; border-radius: 0; padding: 4px 12px; font-size: 13px; }
-  .alternar button.ativo { background: var(--marca-suave); color: var(--marca); font-weight: 600; }
   .cal-rolagem { padding-top: 10px; border-top: 2px solid var(--marca); }  /* cresce com o dia, sem barra própria */
   .cal { position: relative; margin-left: 52px; }
   .cal .hora { position: absolute; left: -52px; width: 44px; text-align: right; font-size: 12px; color: var(--suave);
@@ -266,6 +266,10 @@
   .sel-campo .linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .sel-campo input { width: min(280px, 100%); font-family: Consolas, ui-monospace, monospace; }
   .sel-campo input[type=time] { width: auto; }
+  .sel-campo input.livre { width: 100%; font-family: inherit; }
+  .sel-campo .dupla-sel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; }
+  @media (max-width: 700px) { .sel-campo .dupla-sel { grid-template-columns: 1fr; } }
+  .painel-sel { scroll-margin-top: 16px; }
   .painel-sel .sugestoes { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .painel-sel .sugestoes .rot { font-size: 12px; color: var(--suave); }
   .painel-sel .sugestoes button { padding: 3px 10px; font-size: 13px; border-radius: 999px; background: var(--marca-suave);
@@ -371,10 +375,6 @@
           <button type="button" class="pequeno" id="diaProximo" aria-label="Próximo dia">▶</button>
           <button type="button" class="pequeno" id="diaHoje">Hoje</button>
         </span>
-        <span class="alternar so-aberto" role="group" aria-label="O que mostrar">
-          <button type="button" id="verObservado" class="ativo">Observado</button>
-          <button type="button" id="verPlanilha">Planilha</button>
-        </span>
         <span class="total-cal" id="totalCal"></span>
         <span class="acoes-cal so-aberto">
           <button type="button" class="pequeno" id="abrirReserva">Reservar horário</button>
@@ -383,7 +383,7 @@
         <button type="button" class="pequeno esconder" aria-expanded="true">Esconder</button>
       </div>
       <div class="corpo">
-        <p class="dica-sel" id="dicaSel">Clique num bloco para trocar a issue, ajustar o horário, juntar com o vizinho ou excluir. Ctrl + clique seleciona vários para juntar.</p>
+        <p class="dica-sel" id="dicaSel">Clique num bloco para mudar o título e a descrição, trocar a issue, ajustar o horário, juntar com o vizinho ou excluir. Ctrl + clique seleciona vários para juntar.</p>
         <form class="painel-sel" id="painelSel" hidden>
           <div class="sel-topo">
             <div>
@@ -392,6 +392,14 @@
               <div class="sel-blocos" id="selBlocos"></div>
             </div>
             <button type="button" class="fechar" id="selFechar" aria-label="Fechar">×</button>
+          </div>
+          <div class="sel-campo" id="selRotulo">
+            <label for="selNome">Título e descrição da atividade</label>
+            <div class="dupla-sel">
+              <input id="selNome" class="livre" maxlength="120" autocomplete="off" aria-label="Título da atividade">
+              <input id="selDescricao" class="livre" maxlength="500" autocomplete="off" aria-label="Descrição da atividade">
+            </div>
+            <span class="sel-meta">A descrição vai para a linha da issue na planilha. Deixe em branco para voltar ao que foi observado.</span>
           </div>
           <div class="sel-campo" id="selHorario">
             <label for="selDe">Horário</label>
@@ -773,7 +781,6 @@ $("dias").addEventListener("click", e => {
 
 // Calendário do dia (como a visão diária do Tempo)
 
-let modoCal = "observado";
 const PX_MIN = 1.8;  // altura de 1 minuto (1h = 108 px)
 const paraMin = t => { const [h, m] = t.split(":"); return +h * 60 + +m; };
 
@@ -782,50 +789,35 @@ function blocosObservados() {
   const resumo = Object.fromEntries(atividadeCal.tickets.map(t => [t.chave, t.resumo]));
   return atividadeCal.historico.filter(b => b.minutos >= 5).map(b => ({
     inicio: b.inicio, fim: b.fim, de: b.de, ate: b.ate, tipo: b.tipo, minutos: b.minutos,
-    titulo: b.tipo === "ticket" ? b.nome
-      : b.tipo === "reuniao" ? b.nome : "Sem issue",
     // issue: o nome (o que você digitou ou o resumo do Jira) vem antes dos documentos abertos
-    descricao: [b.tipo === "ticket" && resumo[b.nome] && resumo[b.nome] !== b.nome ? resumo[b.nome] : "", ...b.detalhes].filter(Boolean).join(" · "),
+    tituloObservado: b.tipo === "sem" ? "Sem issue" : b.nome,
+    descricaoObservada: [b.tipo === "ticket" && resumo[b.nome] && resumo[b.nome] !== b.nome ? resumo[b.nome] : "", ...b.detalhes].filter(Boolean).join(" · "),
+    tituloEditado: b.titulo_editado || "", descricaoEditada: b.descricao_editada || "",
     chave: b.tipo === "ticket" ? b.nome : "",
-  }));
-}
-
-function blocosDaPlanilha() {
-  if (!rascunho) return [];
-  const linhas = linhasDaTela();
-  const trechos = [...$("linhas").querySelectorAll("tr[data-origem]")].map((tr, i) =>
-    [...tr.querySelectorAll("td.horario span")].map(s => s.textContent.split(" – ")));
-  return linhas.flatMap((l, i) => (trechos[i] || []).map(([inicio, fim]) => ({
-    inicio, fim, minutos: paraMin(fim) - paraMin(inicio),
-    tipo: ["agenda", "meet"].includes(l.origem) ? "reuniao" : l.chave ? "ticket" : "sem",
-    titulo: l.acao || l.chave || "Sem issue", descricao: "", chave: l.chave,
-  })));
+  })).map(b => ({ ...b, titulo: b.tituloEditado || b.tituloObservado, descricao: b.descricaoEditada || b.descricaoObservada }));
 }
 
 function desenharCalendario() {
   if (!estado) return;
   const hoje = estado.hoje;
-  const planilha = modoCal === "planilha";
-  const blocos = planilha ? blocosDaPlanilha() : blocosObservados();
+  const blocos = blocosObservados();
   const pausas = atividadeCal?.pausas || [];
   const total = blocos.reduce((s, b) => s + b.minutos, 0);
   const jornada = estado.preferencias.jornada_minutos;
-  $("tituloCal").textContent = planilha ? "Planilha no Tempo" : "Histórico do dia";
+  $("tituloCal").textContent = !diaSel || diaSel === hoje ? "Histórico do dia" : `Histórico de ${dataBonita(diaSel)}`;
   $("totalCal").textContent = `${hhmm(total)} de ${hhmm(jornada)}`;
-  $("verObservado").classList.toggle("ativo", !planilha);
-  $("verPlanilha").classList.toggle("ativo", planilha);
 
   const cal = $("calendario");
   if (!blocos.length) {
     cal.style.height = "auto";
-    cal.innerHTML = `<p class="vazio" style="padding:12px 0">${planilha ? "Gere o rascunho para ver a planilha aqui." : "Nada observado ainda hoje."}</p>`;
+    cal.innerHTML = `<p class="vazio" style="padding:12px 0">Nada observado neste dia.</p>`;
     return;
   }
   const agora = new Date();
   const agoraMin = agora.getHours() * 60 + agora.getMinutes();
   const mostrarAgora = diaSel === hoje;
   const inicios = [...blocos.map(b => paraMin(b.inicio)), ...pausas.map(p => paraMin(p.inicio))];
-  const fins = [...blocos.map(b => paraMin(b.fim)), ...pausas.map(p => paraMin(p.fim)), ...(mostrarAgora && !planilha ? [agoraMin] : [])];
+  const fins = [...blocos.map(b => paraMin(b.fim)), ...pausas.map(p => paraMin(p.fim)), ...(mostrarAgora ? [agoraMin] : [])];
   const ini = Math.floor(Math.min(...inicios) / 60) * 60;
   const fim = Math.max(Math.ceil(Math.max(...fins) / 60) * 60, ini + 120);
   const y = m => (m - ini) * PX_MIN;
@@ -840,14 +832,13 @@ function desenharCalendario() {
     const alt = (paraMin(p.fim) - paraMin(p.inicio)) * PX_MIN;
     if (alt >= 6) html += `<div class="pausa-cal" style="top:${y(paraMin(p.inicio))}px;height:${alt}px">${alt >= 16 ? `Pausa ${p.inicio}–${p.fim} · ${MOTIVOS[p.motivo] || p.motivo}` : ""}</div>`;
   }
-  blocosCal = planilha ? [] : blocos;
+  blocosCal = blocos;
   selecao = new Set([...selecao].filter(de => blocosCal.some(b => b.de === de)));
-  cal.classList.toggle("editavel", !planilha);
-  $("dicaSel").hidden = planilha;
+  cal.classList.add("editavel");
   for (const [i, b] of blocos.entries()) {
     const topo = y(paraMin(b.inicio)) + 3, alt = Math.max((paraMin(b.fim) - paraMin(b.inicio)) * PX_MIN - 6, 22);
     const duracao = b.minutos >= 60 ? hhmm(b.minutos) : `${b.minutos}min`;
-    const sel = !planilha && selecao.has(b.de) ? " selecionado" : "";
+    const sel = selecao.has(b.de) ? " selecionado" : "";
     html += `<div class="bloco ${b.tipo}${alt < 60 ? " compacto" : ""}${sel}" data-i="${i}" style="top:${topo}px;height:${alt}px"
                title="${esc(`${b.inicio}–${b.fim} · ${b.titulo}${b.descricao ? " · " + b.descricao : ""}`)}">
       <span class="titulo">${esc(b.titulo)}</span>
@@ -861,7 +852,6 @@ function desenharCalendario() {
   cal.innerHTML = html;
 }
 
-$("verObservado").addEventListener("click", () => { modoCal = "observado"; desenharCalendario(); });
 
 // Correção pelo calendário: clicar seleciona um bloco; Ctrl + clique seleciona vários.
 
@@ -889,6 +879,14 @@ function mostrarPainel() {
   $("selProximo").hidden = sel.length > 1 || i >= blocosCal.length - 1;
   $("selReunioesRot").hidden = !reuniaoNoMeio;
   if (!$("selChave").value) $("selChave").value = sel.find(b => b.chave)?.chave || "";
+  const chaveSel = sel.map(b => b.de).join("|");
+  if ($("selNome").dataset.blocos !== chaveSel) {  // só preenche quando a seleção muda, para não apagar o que você digita
+    $("selNome").dataset.blocos = chaveSel;
+    $("selNome").value = sel.length === 1 ? de.tituloEditado : "";
+    $("selDescricao").value = sel.length === 1 ? de.descricaoEditada : "";
+    $("selNome").placeholder = sel.length === 1 ? de.tituloObservado : "Título do bloco juntado (opcional)";
+    $("selDescricao").placeholder = sel.length === 1 ? (de.descricaoObservada || "O que você fez neste trecho") : "Descrição (opcional)";
+  }
   // sugestões pelo texto do bloco (resumo e documentos), como na planilha
   const texto = sel.map(b => `${b.titulo} ${b.descricao}`).join(" ");
   api("GET", `/sugerir?texto=${encodeURIComponent(texto)}`).then(s => {
@@ -899,12 +897,13 @@ function mostrarPainel() {
 
 function limparSelecao() {
   selecao.clear(); $("selChave").value = ""; $("selReunioes").checked = false; delete $("selDe").dataset.bloco;
+  $("selNome").value = ""; $("selDescricao").value = ""; delete $("selNome").dataset.blocos;
   $("painelSel").hidden = true; desenharCalendario();
 }
 
 $("calendario").addEventListener("click", e => {
   const el = e.target.closest(".bloco[data-i]");
-  if (!el || modoCal !== "observado") return;
+  if (!el) return;
   const b = blocosCal[+el.dataset.i];
   if (e.ctrlKey || e.metaKey) {
     selecao.has(b.de) ? selecao.delete(b.de) : selecao.add(b.de);
@@ -914,6 +913,10 @@ $("calendario").addEventListener("click", e => {
     $("selChave").value = "";
   }
   desenharCalendario(); mostrarPainel();
+  if (selecao.size) {  // leva até o painel, lá em cima, para ajustar
+    $("painelSel").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!(e.ctrlKey || e.metaKey)) setTimeout(() => $("selNome").focus({ preventScroll: true }), 300);
+  }
 });
 
 async function aplicarSelecao(blocos, chave) {
@@ -928,16 +931,35 @@ async function aplicarSelecao(blocos, chave) {
 
 $("painelSel").addEventListener("submit", e => {
   e.preventDefault();
-  const sel = selecionados();
-  const b = sel[0];
+  const sel = [...selecionados()].sort((a, b) => a.de.localeCompare(b.de));
+  if (!sel.length) return;
+  const b = sel[0], ultimo = sel[sel.length - 1];
+  const titulo = $("selNome").value.trim(), descricao = $("selDescricao").value.trim();
+  const chave = $("selChave").value.trim();
   const mudouHorario = sel.length === 1 && ($("selDe").value !== b.de.slice(11, 16) || $("selAte").value !== b.ate.slice(11, 16));
-  if (!mudouHorario) return tentar(() => aplicarSelecao(sel, $("selChave").value));
+  const mudouChave = sel.length > 1 || chave !== (b.chave || "");
+  const mudouRotulo = sel.length > 1 ? !!(titulo || descricao) : titulo !== b.tituloEditado || descricao !== b.descricaoEditada;
+  if (!mudouHorario && !mudouChave && !mudouRotulo) { limparSelecao(); return; }
   tentar(async () => {
-    const r = await api("POST", `/dias/${diaSel}/ajustar`, {
-      de: b.de, ate: b.ate, novo_de: $("selDe").value, novo_ate: $("selAte").value, tipo: b.tipo,
-      nome: b.tipo === "reuniao" ? b.titulo : null, chave: $("selChave").value || b.chave, incluir_reunioes: $("selReunioes").checked,
-    });
-    avisar(`Bloco ajustado: ${r.inicio}–${r.fim} (${hhmm(r.minutos)}).`);
+    let de = b.de, ate = ultimo.ate, msg = "";
+    if (mudouHorario) {
+      const r = await api("POST", `/dias/${diaSel}/ajustar`, {
+        de: b.de, ate: b.ate, novo_de: $("selDe").value, novo_ate: $("selAte").value, tipo: b.tipo,
+        nome: b.tipo === "reuniao" ? b.tituloObservado : null, chave: chave || b.chave, incluir_reunioes: $("selReunioes").checked,
+      });
+      de = `${diaSel}T${$("selDe").value}:00`; ate = `${diaSel}T${$("selAte").value}:00`;
+      msg = `Bloco ajustado: ${r.inicio}–${r.fim} (${hhmm(r.minutos)}).`;
+    } else if (mudouChave) {
+      const r = await api("POST", `/dias/${diaSel}/reatribuir`, {
+        de: b.de, ate: ultimo.ate, chave, preencher: sel.length > 1, incluir_reunioes: $("selReunioes").checked,
+      });
+      msg = `${r.inicio}–${r.fim} (${hhmm(r.minutos)}) foi para ${r.chave || "sem issue"}.`;
+    }
+    if (mudouRotulo) {
+      await api("POST", `/dias/${diaSel}/rotulo`, { de, ate, titulo, descricao });
+      msg = msg ? `${msg} Título e descrição salvos.` : (titulo || descricao ? "Título e descrição salvos." : "Voltou ao que foi observado.");
+    }
+    avisar(msg);
     limparSelecao(); await atualizar(); await irParaDia(diaSel);
   });
 });
@@ -970,7 +992,6 @@ $("selSugestoes").addEventListener("click", e => {
   if (s) $("selChave").value = s.dataset.chave;
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && selecao.size) limparSelecao(); });
-$("verPlanilha").addEventListener("click", () => { modoCal = "planilha"; desenharCalendario(); });
 
 // Tickets vistos: mover tudo de um item de hoje para outro ticket
 

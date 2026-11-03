@@ -81,6 +81,13 @@ class Banco:
                 chave TEXT PRIMARY KEY,
                 valor TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS rotulos (
+                de TEXT NOT NULL,
+                ate TEXT NOT NULL,
+                titulo TEXT NOT NULL DEFAULT '',
+                descricao TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS rotulos_de ON rotulos (de);
             """
         )
         if "fixo" not in {c[1] for c in self.con.execute("PRAGMA table_info(foco)")}:
@@ -203,8 +210,23 @@ class Banco:
         fechados = "SELECT data FROM dias WHERE status IN ('lancado', 'publicado') AND data < ?"
         n = self.con.execute(f"DELETE FROM amostras WHERE substr(instante, 1, 10) IN ({fechados})", (limite,)).rowcount
         self.con.execute(f"DELETE FROM pausas WHERE substr(inicio, 1, 10) IN ({fechados})", (limite,))
+        self.con.execute(f"DELETE FROM rotulos WHERE substr(de, 1, 10) IN ({fechados})", (limite,))
         self.con.commit()
         return n
+
+    def rotulos(self, dia: date) -> list[dict]:
+        """Título e descrição que você deu a trechos do histórico do dia."""
+        rows = self.con.execute("SELECT de, ate, titulo, descricao FROM rotulos WHERE de LIKE ? ORDER BY de",
+                                (dia.isoformat() + "%",)).fetchall()
+        return [dict(zip(("de", "ate", "titulo", "descricao"), r)) for r in rows]
+
+    def definir_rotulo(self, de: str, ate: str, titulo: str, descricao: str) -> None:
+        """Troca o rótulo do trecho: apaga os que se sobrepõem e grava o novo (vazio = volta ao observado)."""
+        with self._lote():
+            self.con.execute("DELETE FROM rotulos WHERE de < ? AND ate > ?", (ate, de))
+            if titulo or descricao:
+                self.con.execute("INSERT INTO rotulos (de, ate, titulo, descricao) VALUES (?, ?, ?, ?)",
+                                 (de, ate, titulo, descricao))
 
     def reduzir_titulos(self, reduzir) -> None:
         """Uma vez só: troca títulos completos já gravados pelo mínimo necessário."""
